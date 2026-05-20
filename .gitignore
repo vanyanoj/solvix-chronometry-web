@@ -1,0 +1,58 @@
+# --- секреты и локальные конфиги ---
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+*.egg-info/
+dist/
+build/
+
+# --- Node / фронты (на будущее) ---
+node_modules/
+.next/
+.turbo/
+.vite/
+.cache/
+.parcel-cache/
+.eslintcache
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- сборка ---
+*.tsbuildinfo
+
+# --- IDE / редакторы ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- macOS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# --- Docker volumes (если кто-то решит хранить рядом) ---
+postgres_data/
+mosquitto_data/

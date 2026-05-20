@@ -1,0 +1,57 @@
+name: solvix-chronometry
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: solvix-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-solvix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-solvix_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-solvix_chronometry}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-solvix} -d ${POSTGRES_DB:-solvix_chronometry}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: solvix-mosquitto
+    ports:
+      - "1883:1883"   # MQTT
+      - "9001:9001"   # WebSocket (для дашборда старшего)
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+
+  backend:
+    build:
+      context: ../apps/backend
+      dockerfile: Dockerfile
+    container_name: solvix-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-solvix}:${POSTGRES_PASSWORD:-solvix_dev_password}@postgres:5432/${POSTGRES_DB:-solvix_chronometry}
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+      APP_ENV: ${APP_ENV:-development}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../apps/backend/src:/app/src
+      - ../apps/backend/alembic:/app/alembic
+      - ../apps/backend/alembic.ini:/app/alembic.ini
+
+volumes:
+  postgres_data:
+  mosquitto_data:
+  mosquitto_log:
