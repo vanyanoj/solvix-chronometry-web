@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Solvix Chronometry — Дашборд старшего</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Display", sans-serif;
+            background:
+                radial-gradient(ellipse 60% 40% at 50% 0%, #1e1e24 0%, transparent 60%),
+                #0a0a0c;
+            color: #e5e5e5;
+            min-height: 100vh;
+            padding: 48px 24px;
+            font-feature-settings: "tnum" 1, "ss01" 1;
+        }
+
+        header { text-align: center; margin-bottom: 64px; }
+
+        h1 {
+            font-size: 1.875rem;
+            font-weight: 600;
+            background: linear-gradient(180deg, #fafafa 0%, #a3a3a3 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            color: #737373;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: #22c55e;
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        .pyramid {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 32px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .row {
+            display: flex;
+            gap: 32px;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .row.middle {
+            justify-content: space-between;
+            padding: 0 96px;
+        }
+
+        .card {
+            background: linear-gradient(180deg, #1a1a1e 0%, #141417 100%);
+            border: 1px solid #2a2a30;
+            border-radius: 16px;
+            padding: 22px 24px 24px;
+            width: 320px;
+            box-shadow:
+                0 4px 24px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.03);
+            transition:
+                border-color 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: transparent;
+            transition: background 0.5s;
+        }
+
+        .card.fresh {
+            border-color: #F59E0B;
+            transform: translateY(-3px);
+            box-shadow:
+                0 12px 40px rgba(245, 158, 11, 0.18),
+                inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        }
+
+        .card.fresh::before {
+            background: linear-gradient(90deg, transparent, #F59E0B, transparent);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 22px;
+            padding-bottom: 18px;
+            border-bottom: 1px solid #232328;
+        }
+
+        .card-title {
+            font-size: 1.0625rem;
+            font-weight: 600;
+            color: #fafafa;
+            letter-spacing: -0.01em;
+        }
+
+        .card-tier {
+            font-size: 0.6rem;
+            color: #a3a3a3;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            background: #1f1f24;
+            border: 1px solid #2a2a30;
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 22px;
+            padding: 14px 16px;
+            background: rgba(255, 255, 255, 0.015);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            transition: all 0.4s;
+        }
+
+        .status-dot.working   { background: #22c55e; box-shadow: 0 0 16px rgba(34, 197, 94, 0.6); }
+        .status-dot.scanning  { background: #3b82f6; box-shadow: 0 0 16px rgba(59, 130, 246, 0.6); }
+        .status-dot.finishing { background: #F59E0B; box-shadow: 0 0 16px rgba(245, 158, 11, 0.6); }
+        .status-dot.outgoing  { background: #06b6d4; box-shadow: 0 0 16px rgba(6, 182, 212, 0.6); }
+        .status-dot.idle      { background: #404040; box-shadow: none; }
+
+        .status-text {
+            font-size: 0.9375rem;
+            font-weight: 600;
+            color: #fafafa;
+            letter-spacing: -0.01em;
+        }
+
+        .status-text.idle { color: #737373; font-weight: 500; }
+
+        .meta { display: flex; flex-direction: column; gap: 10px; }
+
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            font-size: 0.8125rem;
+        }
+
+        .meta-label {
+            color: #737373;
+            font-weight: 500;
+        }
+
+        .meta-value {
+            color: #d4d4d4;
+            font-weight: 500;
+        }
+
+        .meta-value.mono {
+            font-family: "SF Mono", "JetBrains Mono", Menlo, Monaco, monospace;
+            font-size: 0.75rem;
+            color: #a3a3a3;
+        }
+
+        .meta-value.empty {
+            color: #525252;
+            font-style: italic;
+        }
+
+        .footer {
+            text-align: center;
+            color: #404040;
+            font-size: 0.7rem;
+            margin-top: 64px;
+            font-family: "SF Mono", monospace;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Solvix Chronometry</h1>
+        <div class="subtitle"><span class="live-dot"></span>Дашборд старшего · Live</div>
+    </header>
+
+    <div class="pyramid">
+        <div class="row top"><div class="card" id="card-4"></div></div>
+        <div class="row middle">
+            <div class="card" id="card-2"></div>
+            <div class="card" id="card-3"></div>
+        </div>
+        <div class="row bottom"><div class="card" id="card-1"></div></div>
+    </div>
+
+    <div class="footer" id="updated">—</div>
+
+    <script>
+        const API_URL = '/api/v1/dashboard/stations';
+        const POLL_INTERVAL_MS = 2000;
+
+        const cardMap = {
+            'Test Station 1': { id: 'card-1', tier: 'Вход' },
+            'Test Station 2': { id: 'card-2', tier: 'Среднее' },
+            'Test Station 3': { id: 'card-3', tier: 'Среднее' },
+            'Test Station 4': { id: 'card-4', tier: 'Выход' },
+        };
+
+        // Mapping event_type → { status class, human label }
+        const statusMap = {
+            'scan_in':  { cls: 'scanning',  text: 'Принимает деталь' },
+            'start':    { cls: 'working',   text: 'В работе' },
+            'stop':     { cls: 'finishing', text: 'Готов к выгрузке' },
+            'scan_out': { cls: 'outgoing',  text: 'Отгружено' },
+        };
+
+        const previousEvent = {};
+
+        function fmtTime(iso) {
+            const d = new Date(iso);
+            return [d.getHours(), d.getMinutes(), d.getSeconds()]
+                .map(n => String(n).padStart(2, '0')).join(':');
+        }
+
+        function secondsAgo(iso) {
+            return Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+        }
+
+        function formatDuration(s) {
+            if (s < 60) return `${s} с`;
+            return `${Math.floor(s / 60)} мин ${s % 60} с`;
+        }
+
+        function renderCard(station) {
+            const cfg = cardMap[station.name];
+            if (!cfg) return;
+            const el = document.getElementById(cfg.id);
+            if (!el) return;
+
+            const status = station.last_event
+                ? (statusMap[station.last_event.type] || { cls: 'idle', text: station.last_event.type })
+                : { cls: 'idle', text: 'Простой' };
+
+            const operator = station.operator
+                ? `<span class="meta-value">${station.operator.full_name}</span>`
+                : `<span class="meta-value empty">не назначен</span>`;
+
+            const lastEventBlock = station.last_event
+                ? `
+                    <div class="meta-row">
+                        <span class="meta-label">Длится</span>
+                        <span class="meta-value mono">${formatDuration(secondsAgo(station.last_event.at))}</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Время события</span>
+                        <span class="meta-value mono">${fmtTime(station.last_event.at)}</span>
+                    </div>
+                  `
+                : `
+                    <div class="meta-row">
+                        <span class="meta-label">События</span>
+                        <span class="meta-value empty">пока нет</span>
+                    </div>
+                  `;
+
+            el.innerHTML = `
+                <div class="card-header">
+                    <span class="card-title">${station.name}</span>
+                    <span class="card-tier">${cfg.tier}</span>
+                </div>
+                <div class="status">
+                    <span class="status-dot ${status.cls}"></span>
+                    <span class="status-text ${status.cls === 'idle' ? 'idle' : ''}">${status.text}</span>
+                </div>
+                <div class="meta">
+                    <div class="meta-row">
+                        <span class="meta-label">Оператор</span>
+                        ${operator}
+                    </div>
+                    ${lastEventBlock}
+                </div>
+            `;
+
+            // Fresh-подсветка при появлении нового события
+            const eventKey = station.last_event ? station.last_event.at + station.last_event.type : null;
+            if (eventKey && previousEvent[station.id] !== eventKey && previousEvent[station.id] !== undefined) {
+                el.classList.add('fresh');
+                setTimeout(() => el.classList.remove('fresh'), 2500);
+            }
+            previousEvent[station.id] = eventKey;
+        }
+
+        async function tick() {
+            try {
+                const res = await fetch(API_URL);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const stations = await res.json();
+                stations.forEach(renderCard);
+                document.getElementById('updated').textContent =
+                    `Last update: ${fmtTime(new Date().toISOString())}`;
+            } catch (err) {
+                document.getElementById('updated').textContent = `Error: ${err.message}`;
+            }
+        }
+
+        tick();
+        setInterval(tick, POLL_INTERVAL_MS);
+    </script>
+</body>
+</html>

@@ -7,6 +7,9 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from solvix_chronometry import __version__
 from solvix_chronometry.config import settings
@@ -48,6 +51,24 @@ app = FastAPI(
 )
 
 app.include_router(dashboard_router, prefix="/api/v1")
+
+# Demo: открытый CORS. На проде сузить allow_origins до реальных доменов фронтов.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Раздаём static/ как /static
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+# Демо-дашборд старшего по красивому URL
+@app.get("/dashboard")
+async def dashboard_redirect():
+    return RedirectResponse(url="/static/dashboard.html")
 
 
 @app.get("/health")

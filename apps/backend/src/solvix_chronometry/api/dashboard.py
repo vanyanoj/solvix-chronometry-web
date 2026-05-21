@@ -30,6 +30,7 @@ class LastEventSnapshot(BaseModel):
     """Последнее зафиксированное событие на станке."""
     type: str
     at: datetime
+    part_id: str | None = None
 
 
 class StationSnapshot(BaseModel):
@@ -90,7 +91,7 @@ async def get_dashboard_stations(
         last_event: LastEventSnapshot | None = None
         if event is not None:
             event_type_str = getattr(event.event_type, "value", str(event.event_type))
-            last_event = LastEventSnapshot(type=event_type_str, at=event.timestamp)
+            last_event = LastEventSnapshot(type=event_type_str, at=event.timestamp, part_id=event.part_id)
 
         result.append(StationSnapshot(
             id=station.id,
