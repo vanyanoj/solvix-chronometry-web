@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from solvix_chronometry.models.base import Base, uuid7_pk
-from solvix_chronometry.models.enums import NfcBadgeStatus, ShiftClosedBy
+from solvix_chronometry.models.enums import NfcBadgeStatus, ShiftClosedBy, UserRole
 
 
 class User(Base):
@@ -25,6 +25,9 @@ class User(Base):
     id: Mapped[uuid.UUID] = uuid7_pk()
     pass_code: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[UserRole] = mapped_column(
+        nullable=False, server_default=UserRole.operator.value
+    )
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
