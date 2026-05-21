@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from solvix_chronometry.models.events import Event
 from solvix_chronometry.models.people import Shift
 from solvix_chronometry.mqtt.schemas import StationEvent
+from solvix_chronometry.ws.hub import hub
 
 logger = logging.getLogger(__name__)
 
@@ -62,3 +63,12 @@ async def handle_station_event(event: StationEvent, session: AsyncSession) -> No
             "event stored: id=%s station=%s type=%s",
             event.id, event.station_id, event.event_type,
         )
+        # Real-time push фронтам (dashboard, в будущем — React)
+        await hub.broadcast({
+            "type": "event",
+            "id": str(event.id),
+            "station_id": str(event.station_id),
+            "event_type": str(event.event_type),
+            "timestamp": event.timestamp,
+            "part_id": event.part_id,
+        })

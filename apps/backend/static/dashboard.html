@@ -64,17 +64,8 @@
             margin: 0 auto;
         }
 
-        .row {
-            display: flex;
-            gap: 32px;
-            justify-content: center;
-            width: 100%;
-        }
-
-        .row.middle {
-            justify-content: space-between;
-            padding: 0 96px;
-        }
+        .row { display: flex; gap: 32px; justify-content: center; width: 100%; }
+        .row.middle { justify-content: space-between; padding: 0 96px; }
 
         .card {
             background: linear-gradient(180deg, #1a1a1e 0%, #141417 100%);
@@ -123,12 +114,7 @@
             border-bottom: 1px solid #232328;
         }
 
-        .card-title {
-            font-size: 1.0625rem;
-            font-weight: 600;
-            color: #fafafa;
-            letter-spacing: -0.01em;
-        }
+        .card-title { font-size: 1.0625rem; font-weight: 600; color: #fafafa; letter-spacing: -0.01em; }
 
         .card-tier {
             font-size: 0.6rem;
@@ -154,10 +140,7 @@
         }
 
         .status-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            flex-shrink: 0;
+            width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
             transition: all 0.4s;
         }
 
@@ -167,59 +150,26 @@
         .status-dot.outgoing  { background: #06b6d4; box-shadow: 0 0 16px rgba(6, 182, 212, 0.6); }
         .status-dot.idle      { background: #404040; box-shadow: none; }
 
-        .status-text {
-            font-size: 0.9375rem;
-            font-weight: 600;
-            color: #fafafa;
-            letter-spacing: -0.01em;
-        }
-
+        .status-text { font-size: 0.9375rem; font-weight: 600; color: #fafafa; letter-spacing: -0.01em; }
         .status-text.idle { color: #737373; font-weight: 500; }
 
         .meta { display: flex; flex-direction: column; gap: 10px; }
-
-        .meta-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            font-size: 0.8125rem;
-        }
-
-        .meta-label {
-            color: #737373;
-            font-weight: 500;
-        }
-
-        .meta-value {
-            color: #d4d4d4;
-            font-weight: 500;
-        }
-
-        .meta-value.mono {
-            font-family: "SF Mono", "JetBrains Mono", Menlo, Monaco, monospace;
-            font-size: 0.75rem;
-            color: #a3a3a3;
-        }
-
-        .meta-value.empty {
-            color: #525252;
-            font-style: italic;
-        }
+        .meta-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.8125rem; }
+        .meta-label { color: #737373; font-weight: 500; }
+        .meta-value { color: #d4d4d4; font-weight: 500; }
+        .meta-value.mono { font-family: "SF Mono", "JetBrains Mono", Menlo, Monaco, monospace; font-size: 0.75rem; color: #a3a3a3; }
+        .meta-value.empty { color: #525252; font-style: italic; }
 
         .footer {
-            text-align: center;
-            color: #404040;
-            font-size: 0.7rem;
-            margin-top: 64px;
-            font-family: "SF Mono", monospace;
-            letter-spacing: 0.05em;
+            text-align: center; color: #404040; font-size: 0.7rem;
+            margin-top: 64px; font-family: "SF Mono", monospace; letter-spacing: 0.05em;
         }
     </style>
 </head>
 <body>
     <header>
         <h1>Solvix Chronometry</h1>
-        <div class="subtitle"><span class="live-dot"></span>Дашборд старшего · Live</div>
+        <div class="subtitle"><span class="live-dot"></span>Дашборд старшего · Live (WebSocket)</div>
     </header>
 
     <div class="pyramid">
@@ -235,7 +185,10 @@
 
     <script>
         const API_URL = '/api/v1/dashboard/stations';
-        const POLL_INTERVAL_MS = 2000;
+        const WS_PROTOCOL = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const WS_URL = `${WS_PROTOCOL}//${location.host}/api/v1/ws/events`;
+        const RECONNECT_DELAY_MS = 2000;
+        const TICK_INTERVAL_MS = 1000;
 
         const cardMap = {
             'Test Station 1': { id: 'card-1', tier: 'Вход' },
@@ -244,7 +197,6 @@
             'Test Station 4': { id: 'card-4', tier: 'Выход' },
         };
 
-        // Mapping event_type → { status class, human label }
         const statusMap = {
             'scan_in':  { cls: 'scanning',  text: 'Принимает деталь' },
             'start':    { cls: 'working',   text: 'В работе' },
@@ -252,7 +204,12 @@
             'scan_out': { cls: 'outgoing',  text: 'Отгружено' },
         };
 
+        // Локальный state — обновляется из initial fetch + WS-событий
+        let stations = [];
+        let stationById = {};
         const previousEvent = {};
+
+        // === Утилиты форматирования ===
 
         function fmtTime(iso) {
             const d = new Date(iso);
@@ -268,6 +225,12 @@
             if (s < 60) return `${s} с`;
             return `${Math.floor(s / 60)} мин ${s % 60} с`;
         }
+
+        function setStatus(text) {
+            document.getElementById('updated').textContent = text;
+        }
+
+        // === Рендер карточки ===
 
         function renderCard(station) {
             const cfg = cardMap[station.name];
@@ -292,14 +255,12 @@
                     <div class="meta-row">
                         <span class="meta-label">Время события</span>
                         <span class="meta-value mono">${fmtTime(station.last_event.at)}</span>
-                    </div>
-                  `
+                    </div>`
                 : `
                     <div class="meta-row">
                         <span class="meta-label">События</span>
                         <span class="meta-value empty">пока нет</span>
-                    </div>
-                  `;
+                    </div>`;
 
             el.innerHTML = `
                 <div class="card-header">
@@ -319,7 +280,6 @@
                 </div>
             `;
 
-            // Fresh-подсветка при появлении нового события
             const eventKey = station.last_event ? station.last_event.at + station.last_event.type : null;
             if (eventKey && previousEvent[station.id] !== eventKey && previousEvent[station.id] !== undefined) {
                 el.classList.add('fresh');
@@ -328,21 +288,73 @@
             previousEvent[station.id] = eventKey;
         }
 
-        async function tick() {
+        // === Initial load (REST) ===
+
+        async function initialLoad() {
             try {
                 const res = await fetch(API_URL);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const stations = await res.json();
+                stations = await res.json();
+                stationById = Object.fromEntries(stations.map(s => [s.id, s]));
                 stations.forEach(renderCard);
-                document.getElementById('updated').textContent =
-                    `Last update: ${fmtTime(new Date().toISOString())}`;
+                setStatus(`Initial load: ${fmtTime(new Date().toISOString())}`);
             } catch (err) {
-                document.getElementById('updated').textContent = `Error: ${err.message}`;
+                setStatus(`Initial load error: ${err.message}`);
             }
         }
 
-        tick();
-        setInterval(tick, POLL_INTERVAL_MS);
+        // === WS-обработка одного события ===
+
+        function applyEvent(evt) {
+            const station = stationById[evt.station_id];
+            if (!station) {
+                console.warn('Unknown station_id in WS event:', evt.station_id);
+                return;
+            }
+            station.last_event = {
+                type: evt.event_type,
+                at: evt.timestamp,
+                part_id: evt.part_id,
+            };
+            renderCard(station);
+            setStatus(`Last event: ${fmtTime(new Date().toISOString())}`);
+        }
+
+        // === WebSocket с auto-reconnect ===
+
+        function connectWS() {
+            const ws = new WebSocket(WS_URL);
+
+            ws.onopen = () => console.log('✓ WS connected');
+
+            ws.onmessage = (e) => {
+                try {
+                    const msg = JSON.parse(e.data);
+                    if (msg.type === 'event') applyEvent(msg);
+                } catch (err) {
+                    console.warn('WS parse error:', err);
+                }
+            };
+
+            ws.onclose = () => {
+                console.log(`WS disconnected, reconnect in ${RECONNECT_DELAY_MS}ms`);
+                setTimeout(connectWS, RECONNECT_DELAY_MS);
+            };
+
+            ws.onerror = (err) => {
+                console.warn('WS error:', err);
+                ws.close();
+            };
+        }
+
+        // === Локальный 1-сек тик для обновления «Длится X с» (без сети) ===
+
+        setInterval(() => {
+            stations.forEach(s => { if (s.last_event) renderCard(s); });
+        }, TICK_INTERVAL_MS);
+
+        // Поехали
+        initialLoad().then(connectWS);
     </script>
 </body>
 </html>
