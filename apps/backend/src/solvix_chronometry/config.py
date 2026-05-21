@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     mqtt_host: str = "localhost"
     mqtt_port: int = 1883
 
+    # --- JWT ---
+    jwt_secret_key: str = Field(
+        description="Секрет для подписи JWT-токенов (см. .env.example)",
+    )
+    jwt_algorithm: str = "HS256"
+    jwt_expires_min: int = 720  # 12 часов = одна смена
+
     # --- App ---
     app_env: str = "development"
 
