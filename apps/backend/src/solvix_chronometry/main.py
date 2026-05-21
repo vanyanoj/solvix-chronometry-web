@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from solvix_chronometry import __version__
 from solvix_chronometry.config import settings
+from solvix_chronometry.api.dashboard import router as dashboard_router
 from solvix_chronometry.mqtt.subscriber import run_subscriber
 
 # Без явного basicConfig uvicorn не пробрасывает наши INFO-логи в консоль
@@ -45,6 +46,8 @@ app = FastAPI(
     description="Backend Edge-сервера системы хронометража.",
     lifespan=lifespan,
 )
+
+app.include_router(dashboard_router, prefix="/api/v1")
 
 
 @app.get("/health")
