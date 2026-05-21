@@ -56,7 +56,7 @@ async def handle_station_event(event: StationEvent, session: AsyncSession) -> No
     await session.commit()
 
     if inserted_id is None:
-        logger.debug("event %s already exists, skipped", event.id)
+        logger.info("event %s already exists, skipped (dedup)", event.id)
     else:
         logger.info(
             "event stored: id=%s station=%s type=%s",

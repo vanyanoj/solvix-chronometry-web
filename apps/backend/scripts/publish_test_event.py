@@ -20,7 +20,7 @@ async def main():
     event_type = sys.argv[2] if len(sys.argv) > 2 else "scan_in"
 
     payload = {
-        "id": str(uuid7()),
+        "id": (sys.argv[3] if len(sys.argv) > 3 else str(uuid7())),
         "station_id": station_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "event_type": event_type,

@@ -11,16 +11,13 @@ import logging
 import aiomqtt
 from pydantic import ValidationError
 
+from solvix_chronometry.config import settings
 from solvix_chronometry.db import SessionLocal
 from solvix_chronometry.mqtt.handler import handle_station_event
 from solvix_chronometry.mqtt.schemas import StationEvent
 
 logger = logging.getLogger(__name__)
 
-# TODO: pull from Pydantic Settings instead of hardcoding.
-# Inside Docker this needs to be 'mosquitto' (compose service name).
-MQTT_HOST = "localhost"
-MQTT_PORT = 1883
 EVENT_TOPIC = "solvix/station/+/event"
 
 
@@ -28,7 +25,7 @@ async def run_subscriber() -> None:
     """Subscribe loop. Reconnects forever — meant to live for the app lifetime."""
     while True:
         try:
-            async with aiomqtt.Client(MQTT_HOST, port=MQTT_PORT) as client:
+            async with aiomqtt.Client(settings.mqtt_host, port=settings.mqtt_port) as client:
                 await client.subscribe(EVENT_TOPIC, qos=1)
                 logger.info("MQTT connected, subscribed to %s", EVENT_TOPIC)
 
