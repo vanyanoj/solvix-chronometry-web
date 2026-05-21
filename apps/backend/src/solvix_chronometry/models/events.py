@@ -51,10 +51,10 @@ class Event(Base):
         index=True,
     )
 
-    shift_id: Mapped[uuid.UUID] = mapped_column(
+    shift_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("shifts.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
 
