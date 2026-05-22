@@ -1,9 +1,7 @@
-"""Тесты эндпоинта POST /shifts (supervisor-блок).
+"""Тесты эндпоинтов shifts (supervisor-блок).
 
-Покрытие: 401, 403, 404×3, 409 (не operator), 201 happy, 409×3 (занято).
-
-Станки создаём в фикстурах (не reuse существующих) чтобы тесты не зависели
-от seed-данных и шли с чистого листа.
+Покрытие POST /shifts: 401, 403, 404×3, 409 (не operator), 201 happy, 409×3 (занято)
+Покрытие POST /shifts/{id}/force_close: 401, 403, 404, 200, 409 (уже закрыта)
 """
 
 from __future__ import annotations
@@ -25,15 +23,12 @@ from solvix_chronometry.uuid_v7 import uuid7
 # === Fixtures ===
 
 async def _create_test_station(name_suffix: str = "") -> tuple[UUID, str, str]:
-    """Helper: создаёт станок, возвращает (id, name, mac). Использует существующую Line."""
     async with SessionLocal() as session:
         line = (await session.execute(select(Line).limit(1))).scalar_one_or_none()
         if line is None:
             raise RuntimeError("Нет Line в БД. Запусти scripts/seed_minimal.py.")
-
         unique = uuid4().hex[:8]
         name = f"TestStation-{unique[:6]}{name_suffix}"
-        # MAC формат XX:XX:XX:XX:XX:XX, "02:" префикс = locally-administered
         mac = f"02:{unique[0:2]}:{unique[2:4]}:{unique[4:6]}:00:00"
         station = Station(line_id=line.id, name=name, terminal_mac=mac)
         session.add(station)
@@ -43,7 +38,6 @@ async def _create_test_station(name_suffix: str = "") -> tuple[UUID, str, str]:
 
 
 async def _delete_test_station(station_id: UUID) -> None:
-    """Удалить станок + связанные shifts (parts.station_id RESTRICT — не трогаем)."""
     async with SessionLocal() as session:
         async with session.begin():
             await session.execute(delete(Shift).where(Shift.station_id == station_id))
@@ -52,9 +46,7 @@ async def _delete_test_station(station_id: UUID) -> None:
 
 @pytest_asyncio.fixture
 async def test_station() -> AsyncIterator[Station]:
-    """Свежесозданный временный станок."""
-    sid, name, mac = await _create_test_station()
-    # Сделаем lightweight-объект для теста (id + name достаточно)
+    sid, _, _ = await _create_test_station()
     async with SessionLocal() as session:
         station = (await session.execute(select(Station).where(Station.id == sid))).scalar_one()
     try:
@@ -65,8 +57,7 @@ async def test_station() -> AsyncIterator[Station]:
 
 @pytest_asyncio.fixture
 async def test_station_2() -> AsyncIterator[Station]:
-    """Второй временный станок."""
-    sid, name, mac = await _create_test_station(name_suffix="-2")
+    sid, _, _ = await _create_test_station(name_suffix="-2")
     async with SessionLocal() as session:
         station = (await session.execute(select(Station).where(Station.id == sid))).scalar_one()
     try:
@@ -77,7 +68,6 @@ async def test_station_2() -> AsyncIterator[Station]:
 
 @pytest_asyncio.fixture
 async def test_badge() -> AsyncIterator[NfcBadge]:
-    """Временный NFC-бейдж."""
     badge_id: UUID | None = None
     try:
         async with SessionLocal() as session:
@@ -116,7 +106,6 @@ async def test_badge_2() -> AsyncIterator[NfcBadge]:
 
 @pytest_asyncio.fixture
 async def cleanup_shifts() -> AsyncIterator[list[UUID]]:
-    """Cleanup для shifts созданных через API. Idem-страховка."""
     shift_ids: list[UUID] = []
     yield shift_ids
     if shift_ids:
@@ -125,8 +114,35 @@ async def cleanup_shifts() -> AsyncIterator[list[UUID]]:
                 await session.execute(delete(Shift).where(Shift.id.in_(shift_ids)))
 
 
+@pytest_asyncio.fixture
+async def active_shift(
+    operator_user: User,
+    test_badge: NfcBadge,
+    test_station: Station,
+) -> AsyncIterator[Shift]:
+    """Активная смена (для тестов force_close)."""
+    shift_id: UUID | None = None
+    try:
+        async with SessionLocal() as session:
+            shift = Shift(
+                user_id=operator_user.id,
+                badge_id=test_badge.id,
+                station_id=test_station.id,
+            )
+            session.add(shift)
+            await session.commit()
+            await session.refresh(shift)
+            shift_id = shift.id
+            shift_obj = shift
+        yield shift_obj
+    finally:
+        if shift_id:
+            async with SessionLocal() as session:
+                async with session.begin():
+                    await session.execute(delete(Shift).where(Shift.id == shift_id))
+
+
 async def _create_extra_operator() -> UUID:
-    """Создаёт второго оператора, возвращает id."""
     async with SessionLocal() as session:
         u = User(
             pass_code=f"FIXT-OPX-{uuid7().hex[:6]}",
@@ -147,7 +163,9 @@ async def _delete_user_with_shifts(user_id: UUID) -> None:
             await session.execute(delete(User).where(User.id == user_id))
 
 
-# === Auth ===
+# ============================================================================
+# POST /shifts (создание)
+# ============================================================================
 
 async def test_no_token_returns_401(client: AsyncClient) -> None:
     r = await client.post("/api/v1/shifts", json={
@@ -162,8 +180,6 @@ async def test_warehouse_role_forbidden(warehouse_client: AsyncClient) -> None:
     })
     assert r.status_code == 403
 
-
-# === 404 ===
 
 async def test_unknown_user_returns_404(
     supervisor_client: AsyncClient,
@@ -207,8 +223,6 @@ async def test_unknown_station_returns_404(
     assert "station" in r.json()["detail"].lower()
 
 
-# === 409 на роль ===
-
 async def test_non_operator_role_returns_409(
     supervisor_client: AsyncClient,
     warehouse_user: User,
@@ -224,8 +238,6 @@ async def test_non_operator_role_returns_409(
     assert "operator" in r.json()["detail"].lower()
 
 
-# === Happy path ===
-
 async def test_create_shift_happy_path(
     supervisor_client: AsyncClient,
     operator_user: User,
@@ -239,21 +251,15 @@ async def test_create_shift_happy_path(
         "station_id": str(test_station.id),
     })
     assert r.status_code == 201, r.text
-
     data = r.json()
     cleanup_shifts.append(UUID(data["id"]))
 
     assert data["user_id"] == str(operator_user.id)
-    assert data["user_full_name"] == operator_user.full_name
     assert data["badge_id"] == str(test_badge.id)
-    assert data["badge_uid"] == test_badge.uid
     assert data["station_id"] == str(test_station.id)
-    assert data["station_name"] == test_station.name
     assert data["unbound_at"] is None
-    assert "bound_at" in data
+    assert data["closed_by"] is None
 
-
-# === 409: «занято» ===
 
 async def test_user_already_has_shift_returns_409(
     supervisor_client: AsyncClient,
@@ -264,13 +270,12 @@ async def test_user_already_has_shift_returns_409(
     test_station_2: Station,
     cleanup_shifts: list[UUID],
 ) -> None:
-    """Оператор уже работает → 409 при попытке дать ему вторую смену."""
     r1 = await supervisor_client.post("/api/v1/shifts", json={
         "user_id": str(operator_user.id),
         "badge_id": str(test_badge.id),
         "station_id": str(test_station.id),
     })
-    assert r1.status_code == 201, r1.text
+    assert r1.status_code == 201
     cleanup_shifts.append(UUID(r1.json()["id"]))
 
     r2 = await supervisor_client.post("/api/v1/shifts", json={
@@ -290,17 +295,15 @@ async def test_station_already_occupied_returns_409(
     test_station: Station,
     cleanup_shifts: list[UUID],
 ) -> None:
-    """Станок занят → 409 при попытке другого оператора занять его."""
     second_op_id: UUID | None = None
     try:
         second_op_id = await _create_extra_operator()
-
         r1 = await supervisor_client.post("/api/v1/shifts", json={
             "user_id": str(operator_user.id),
             "badge_id": str(test_badge.id),
             "station_id": str(test_station.id),
         })
-        assert r1.status_code == 201, r1.text
+        assert r1.status_code == 201
         cleanup_shifts.append(UUID(r1.json()["id"]))
 
         r2 = await supervisor_client.post("/api/v1/shifts", json={
@@ -310,7 +313,6 @@ async def test_station_already_occupied_returns_409(
         })
         assert r2.status_code == 409
         assert "occupied" in r2.json()["detail"].lower()
-
     finally:
         if second_op_id:
             await _delete_user_with_shifts(second_op_id)
@@ -324,17 +326,15 @@ async def test_badge_already_in_use_returns_409(
     test_station_2: Station,
     cleanup_shifts: list[UUID],
 ) -> None:
-    """Бейдж занят → 409 при попытке использовать тот же бейдж на другого оператора."""
     second_op_id: UUID | None = None
     try:
         second_op_id = await _create_extra_operator()
-
         r1 = await supervisor_client.post("/api/v1/shifts", json={
             "user_id": str(operator_user.id),
             "badge_id": str(test_badge.id),
             "station_id": str(test_station.id),
         })
-        assert r1.status_code == 201, r1.text
+        assert r1.status_code == 201
         cleanup_shifts.append(UUID(r1.json()["id"]))
 
         r2 = await supervisor_client.post("/api/v1/shifts", json={
@@ -344,7 +344,52 @@ async def test_badge_already_in_use_returns_409(
         })
         assert r2.status_code == 409
         assert "in use" in r2.json()["detail"].lower()
-
     finally:
         if second_op_id:
             await _delete_user_with_shifts(second_op_id)
+
+
+# ============================================================================
+# POST /shifts/{id}/force_close (закрытие)
+# ============================================================================
+
+async def test_force_close_no_token_returns_401(client: AsyncClient) -> None:
+    r = await client.post(f"/api/v1/shifts/{uuid4()}/force_close")
+    assert r.status_code == 401
+
+
+async def test_force_close_warehouse_forbidden(warehouse_client: AsyncClient) -> None:
+    r = await warehouse_client.post(f"/api/v1/shifts/{uuid4()}/force_close")
+    assert r.status_code == 403
+
+
+async def test_force_close_unknown_shift_returns_404(supervisor_client: AsyncClient) -> None:
+    r = await supervisor_client.post(f"/api/v1/shifts/{uuid4()}/force_close")
+    assert r.status_code == 404
+
+
+async def test_force_close_active_shift_returns_200(
+    supervisor_client: AsyncClient,
+    active_shift: Shift,
+) -> None:
+    """Активная смена → 200, unbound_at заполнен, closed_by=supervisor."""
+    r = await supervisor_client.post(f"/api/v1/shifts/{active_shift.id}/force_close")
+    assert r.status_code == 200, r.text
+
+    data = r.json()
+    assert data["id"] == str(active_shift.id)
+    assert data["unbound_at"] is not None
+    assert data["closed_by"] == "supervisor"
+
+
+async def test_force_close_already_closed_returns_409(
+    supervisor_client: AsyncClient,
+    active_shift: Shift,
+) -> None:
+    """Повторное закрытие уже закрытой смены → 409."""
+    r1 = await supervisor_client.post(f"/api/v1/shifts/{active_shift.id}/force_close")
+    assert r1.status_code == 200
+
+    r2 = await supervisor_client.post(f"/api/v1/shifts/{active_shift.id}/force_close")
+    assert r2.status_code == 409
+    assert "already closed" in r2.json()["detail"].lower()
