@@ -1,0 +1,350 @@
+"""Тесты эндпоинта POST /shifts (supervisor-блок).
+
+Покрытие: 401, 403, 404×3, 409 (не operator), 201 happy, 409×3 (занято).
+
+Станки создаём в фикстурах (не reuse существующих) чтобы тесты не зависели
+от seed-данных и шли с чистого листа.
+"""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from uuid import UUID, uuid4
+
+import pytest_asyncio
+from httpx import AsyncClient
+from sqlalchemy import delete, select
+
+from solvix_chronometry.db import SessionLocal
+from solvix_chronometry.models.enums import UserRole
+from solvix_chronometry.models.hierarchy import Line, Station
+from solvix_chronometry.models.people import NfcBadge, Shift, User
+from solvix_chronometry.uuid_v7 import uuid7
+
+
+# === Fixtures ===
+
+async def _create_test_station(name_suffix: str = "") -> tuple[UUID, str, str]:
+    """Helper: создаёт станок, возвращает (id, name, mac). Использует существующую Line."""
+    async with SessionLocal() as session:
+        line = (await session.execute(select(Line).limit(1))).scalar_one_or_none()
+        if line is None:
+            raise RuntimeError("Нет Line в БД. Запусти scripts/seed_minimal.py.")
+
+        unique = uuid4().hex[:8]
+        name = f"TestStation-{unique[:6]}{name_suffix}"
+        # MAC формат XX:XX:XX:XX:XX:XX, "02:" префикс = locally-administered
+        mac = f"02:{unique[0:2]}:{unique[2:4]}:{unique[4:6]}:00:00"
+        station = Station(line_id=line.id, name=name, terminal_mac=mac)
+        session.add(station)
+        await session.commit()
+        await session.refresh(station)
+        return station.id, station.name, station.terminal_mac
+
+
+async def _delete_test_station(station_id: UUID) -> None:
+    """Удалить станок + связанные shifts (parts.station_id RESTRICT — не трогаем)."""
+    async with SessionLocal() as session:
+        async with session.begin():
+            await session.execute(delete(Shift).where(Shift.station_id == station_id))
+            await session.execute(delete(Station).where(Station.id == station_id))
+
+
+@pytest_asyncio.fixture
+async def test_station() -> AsyncIterator[Station]:
+    """Свежесозданный временный станок."""
+    sid, name, mac = await _create_test_station()
+    # Сделаем lightweight-объект для теста (id + name достаточно)
+    async with SessionLocal() as session:
+        station = (await session.execute(select(Station).where(Station.id == sid))).scalar_one()
+    try:
+        yield station
+    finally:
+        await _delete_test_station(sid)
+
+
+@pytest_asyncio.fixture
+async def test_station_2() -> AsyncIterator[Station]:
+    """Второй временный станок."""
+    sid, name, mac = await _create_test_station(name_suffix="-2")
+    async with SessionLocal() as session:
+        station = (await session.execute(select(Station).where(Station.id == sid))).scalar_one()
+    try:
+        yield station
+    finally:
+        await _delete_test_station(sid)
+
+
+@pytest_asyncio.fixture
+async def test_badge() -> AsyncIterator[NfcBadge]:
+    """Временный NFC-бейдж."""
+    badge_id: UUID | None = None
+    try:
+        async with SessionLocal() as session:
+            badge = NfcBadge(uid=f"FIXT-UID-{uuid7().hex[:8]}")
+            session.add(badge)
+            await session.commit()
+            await session.refresh(badge)
+            badge_id = badge.id
+        yield badge
+    finally:
+        if badge_id:
+            async with SessionLocal() as session:
+                async with session.begin():
+                    await session.execute(delete(Shift).where(Shift.badge_id == badge_id))
+                    await session.execute(delete(NfcBadge).where(NfcBadge.id == badge_id))
+
+
+@pytest_asyncio.fixture
+async def test_badge_2() -> AsyncIterator[NfcBadge]:
+    badge_id: UUID | None = None
+    try:
+        async with SessionLocal() as session:
+            badge = NfcBadge(uid=f"FIXT-UID2-{uuid7().hex[:8]}")
+            session.add(badge)
+            await session.commit()
+            await session.refresh(badge)
+            badge_id = badge.id
+        yield badge
+    finally:
+        if badge_id:
+            async with SessionLocal() as session:
+                async with session.begin():
+                    await session.execute(delete(Shift).where(Shift.badge_id == badge_id))
+                    await session.execute(delete(NfcBadge).where(NfcBadge.id == badge_id))
+
+
+@pytest_asyncio.fixture
+async def cleanup_shifts() -> AsyncIterator[list[UUID]]:
+    """Cleanup для shifts созданных через API. Idem-страховка."""
+    shift_ids: list[UUID] = []
+    yield shift_ids
+    if shift_ids:
+        async with SessionLocal() as session:
+            async with session.begin():
+                await session.execute(delete(Shift).where(Shift.id.in_(shift_ids)))
+
+
+async def _create_extra_operator() -> UUID:
+    """Создаёт второго оператора, возвращает id."""
+    async with SessionLocal() as session:
+        u = User(
+            pass_code=f"FIXT-OPX-{uuid7().hex[:6]}",
+            full_name="Extra Operator",
+            role=UserRole.operator,
+            active=True,
+        )
+        session.add(u)
+        await session.commit()
+        await session.refresh(u)
+        return u.id
+
+
+async def _delete_user_with_shifts(user_id: UUID) -> None:
+    async with SessionLocal() as session:
+        async with session.begin():
+            await session.execute(delete(Shift).where(Shift.user_id == user_id))
+            await session.execute(delete(User).where(User.id == user_id))
+
+
+# === Auth ===
+
+async def test_no_token_returns_401(client: AsyncClient) -> None:
+    r = await client.post("/api/v1/shifts", json={
+        "user_id": str(uuid4()), "badge_id": str(uuid4()), "station_id": str(uuid4()),
+    })
+    assert r.status_code == 401
+
+
+async def test_warehouse_role_forbidden(warehouse_client: AsyncClient) -> None:
+    r = await warehouse_client.post("/api/v1/shifts", json={
+        "user_id": str(uuid4()), "badge_id": str(uuid4()), "station_id": str(uuid4()),
+    })
+    assert r.status_code == 403
+
+
+# === 404 ===
+
+async def test_unknown_user_returns_404(
+    supervisor_client: AsyncClient,
+    test_badge: NfcBadge,
+    test_station: Station,
+) -> None:
+    r = await supervisor_client.post("/api/v1/shifts", json={
+        "user_id": str(uuid4()),
+        "badge_id": str(test_badge.id),
+        "station_id": str(test_station.id),
+    })
+    assert r.status_code == 404
+    assert "user" in r.json()["detail"].lower()
+
+
+async def test_unknown_badge_returns_404(
+    supervisor_client: AsyncClient,
+    operator_user: User,
+    test_station: Station,
+) -> None:
+    r = await supervisor_client.post("/api/v1/shifts", json={
+        "user_id": str(operator_user.id),
+        "badge_id": str(uuid4()),
+        "station_id": str(test_station.id),
+    })
+    assert r.status_code == 404
+    assert "badge" in r.json()["detail"].lower()
+
+
+async def test_unknown_station_returns_404(
+    supervisor_client: AsyncClient,
+    operator_user: User,
+    test_badge: NfcBadge,
+) -> None:
+    r = await supervisor_client.post("/api/v1/shifts", json={
+        "user_id": str(operator_user.id),
+        "badge_id": str(test_badge.id),
+        "station_id": str(uuid4()),
+    })
+    assert r.status_code == 404
+    assert "station" in r.json()["detail"].lower()
+
+
+# === 409 на роль ===
+
+async def test_non_operator_role_returns_409(
+    supervisor_client: AsyncClient,
+    warehouse_user: User,
+    test_badge: NfcBadge,
+    test_station: Station,
+) -> None:
+    r = await supervisor_client.post("/api/v1/shifts", json={
+        "user_id": str(warehouse_user.id),
+        "badge_id": str(test_badge.id),
+        "station_id": str(test_station.id),
+    })
+    assert r.status_code == 409
+    assert "operator" in r.json()["detail"].lower()
+
+
+# === Happy path ===
+
+async def test_create_shift_happy_path(
+    supervisor_client: AsyncClient,
+    operator_user: User,
+    test_badge: NfcBadge,
+    test_station: Station,
+    cleanup_shifts: list[UUID],
+) -> None:
+    r = await supervisor_client.post("/api/v1/shifts", json={
+        "user_id": str(operator_user.id),
+        "badge_id": str(test_badge.id),
+        "station_id": str(test_station.id),
+    })
+    assert r.status_code == 201, r.text
+
+    data = r.json()
+    cleanup_shifts.append(UUID(data["id"]))
+
+    assert data["user_id"] == str(operator_user.id)
+    assert data["user_full_name"] == operator_user.full_name
+    assert data["badge_id"] == str(test_badge.id)
+    assert data["badge_uid"] == test_badge.uid
+    assert data["station_id"] == str(test_station.id)
+    assert data["station_name"] == test_station.name
+    assert data["unbound_at"] is None
+    assert "bound_at" in data
+
+
+# === 409: «занято» ===
+
+async def test_user_already_has_shift_returns_409(
+    supervisor_client: AsyncClient,
+    operator_user: User,
+    test_badge: NfcBadge,
+    test_badge_2: NfcBadge,
+    test_station: Station,
+    test_station_2: Station,
+    cleanup_shifts: list[UUID],
+) -> None:
+    """Оператор уже работает → 409 при попытке дать ему вторую смену."""
+    r1 = await supervisor_client.post("/api/v1/shifts", json={
+        "user_id": str(operator_user.id),
+        "badge_id": str(test_badge.id),
+        "station_id": str(test_station.id),
+    })
+    assert r1.status_code == 201, r1.text
+    cleanup_shifts.append(UUID(r1.json()["id"]))
+
+    r2 = await supervisor_client.post("/api/v1/shifts", json={
+        "user_id": str(operator_user.id),
+        "badge_id": str(test_badge_2.id),
+        "station_id": str(test_station_2.id),
+    })
+    assert r2.status_code == 409
+    assert "already has an active shift" in r2.json()["detail"].lower()
+
+
+async def test_station_already_occupied_returns_409(
+    supervisor_client: AsyncClient,
+    operator_user: User,
+    test_badge: NfcBadge,
+    test_badge_2: NfcBadge,
+    test_station: Station,
+    cleanup_shifts: list[UUID],
+) -> None:
+    """Станок занят → 409 при попытке другого оператора занять его."""
+    second_op_id: UUID | None = None
+    try:
+        second_op_id = await _create_extra_operator()
+
+        r1 = await supervisor_client.post("/api/v1/shifts", json={
+            "user_id": str(operator_user.id),
+            "badge_id": str(test_badge.id),
+            "station_id": str(test_station.id),
+        })
+        assert r1.status_code == 201, r1.text
+        cleanup_shifts.append(UUID(r1.json()["id"]))
+
+        r2 = await supervisor_client.post("/api/v1/shifts", json={
+            "user_id": str(second_op_id),
+            "badge_id": str(test_badge_2.id),
+            "station_id": str(test_station.id),
+        })
+        assert r2.status_code == 409
+        assert "occupied" in r2.json()["detail"].lower()
+
+    finally:
+        if second_op_id:
+            await _delete_user_with_shifts(second_op_id)
+
+
+async def test_badge_already_in_use_returns_409(
+    supervisor_client: AsyncClient,
+    operator_user: User,
+    test_badge: NfcBadge,
+    test_station: Station,
+    test_station_2: Station,
+    cleanup_shifts: list[UUID],
+) -> None:
+    """Бейдж занят → 409 при попытке использовать тот же бейдж на другого оператора."""
+    second_op_id: UUID | None = None
+    try:
+        second_op_id = await _create_extra_operator()
+
+        r1 = await supervisor_client.post("/api/v1/shifts", json={
+            "user_id": str(operator_user.id),
+            "badge_id": str(test_badge.id),
+            "station_id": str(test_station.id),
+        })
+        assert r1.status_code == 201, r1.text
+        cleanup_shifts.append(UUID(r1.json()["id"]))
+
+        r2 = await supervisor_client.post("/api/v1/shifts", json={
+            "user_id": str(second_op_id),
+            "badge_id": str(test_badge.id),
+            "station_id": str(test_station_2.id),
+        })
+        assert r2.status_code == 409
+        assert "in use" in r2.json()["detail"].lower()
+
+    finally:
+        if second_op_id:
+            await _delete_user_with_shifts(second_op_id)

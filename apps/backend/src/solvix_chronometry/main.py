@@ -18,6 +18,7 @@ from solvix_chronometry.ws.router import router as ws_router
 from solvix_chronometry.api.dashboard import router as dashboard_router
 from solvix_chronometry.api.parts import router as parts_router
 from solvix_chronometry.api.batches import router as batches_router
+from solvix_chronometry.api.shifts import router as shifts_router
 from solvix_chronometry.mqtt.subscriber import run_subscriber
 
 # Без явного basicConfig uvicorn не пробрасывает наши INFO-логи в консоль
@@ -58,6 +59,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(parts_router, prefix="/api/v1")
 app.include_router(batches_router, prefix="/api/v1")
+app.include_router(shifts_router, prefix="/api/v1")
 app.include_router(ws_router, prefix="/api/v1")
 
 # Demo: открытый CORS. На проде сузить allow_origins до реальных доменов фронтов.
