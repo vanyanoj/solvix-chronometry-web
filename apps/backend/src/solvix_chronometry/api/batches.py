@@ -1,13 +1,13 @@
 """Batches endpoints — партии приёмки (warehouse-блок).
 
-API-контракт — Обсидиан → Решения №84 (warehouse) и №30-33 (приёмка).
+API-контракт — Обсидиан → Решения №84 (warehouse), №30-33 (приёмка), №3-9 (QR/наследование).
 """
 from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, ConfigDict
-from sqlalchemy import func, select
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from solvix_chronometry.auth.dependencies import require_role
@@ -21,7 +21,6 @@ router = APIRouter(prefix="/batches", tags=["batches"])
 # === Response schemas ===
 
 class BatchListItem(BaseModel):
-    """Партия в списке: метаданные + счётчики деталей по статусам."""
     id: UUID
     part_type: str
     created_at: datetime
@@ -46,11 +45,51 @@ class BatchPartItem(BaseModel):
 
 
 class BatchDetail(BaseModel):
-    """Партия + полный список всех деталей внутри."""
+    """Партия + полный список деталей внутри."""
     id: UUID
     part_type: str
     created_at: datetime
     parts: list[BatchPartItem]
+
+
+class CreateBatchRequest(BaseModel):
+    """Тело для создания партии — что и сколько."""
+    part_type: str = Field(..., min_length=1, max_length=50, description="Тип детали, напр. 'D'")
+    quantity: int = Field(..., ge=1, le=10000, description="Сколько деталей в партии (1-10000)")
+
+
+class BatchCreatedResponse(BaseModel):
+    """Ответ после создания: метаданные партии + IDs всех деталей для печати."""
+    id: UUID
+    part_type: str
+    created_at: datetime
+    part_ids: list[str]
+
+
+# === Helpers ===
+
+async def _next_part_numbers(
+    session: AsyncSession, part_type: str, count: int
+) -> list[int]:
+    """Вернуть N следующих номеров для деталей данного типа.
+
+    Берёт MAX из trailing-digits существующих base_id (напр. из 'D-0050' → 50),
+    возвращает [max+1, ..., max+count]. Если деталей этого типа нет — стартует с 1.
+
+    TODO для прода: при одновременных запросах двух кладовщиков — race condition,
+    оба получат одинаковый max и попытаются создать одинаковые IDs (UNIQUE conflict).
+    Решение — advisory lock на (part_type) или Postgres sequence per type.
+    Для пилота с одним кладовщиком — некритично.
+    """
+    stmt = text(
+        r"""
+        SELECT COALESCE(MAX(CAST(SUBSTRING(base_id FROM '\d+$') AS INTEGER)), 0)
+        FROM parts
+        WHERE type = :ptype
+        """
+    )
+    max_num = (await session.execute(stmt, {"ptype": part_type})).scalar() or 0
+    return list(range(max_num + 1, max_num + 1 + count))
 
 
 # === Endpoints ===
@@ -61,14 +100,11 @@ class BatchDetail(BaseModel):
     dependencies=[Depends(require_role(UserRole.warehouse))],
 )
 async def list_batches(
-    limit: int = Query(default=50, ge=1, le=200, description="Сколько вернуть (1-200)"),
-    offset: int = Query(default=0, ge=0, description="Смещение для пагинации"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_session),
 ) -> list[BatchListItem]:
-    """Список партий приёмки с разбивкой по статусам деталей.
-
-    Сортировка: свежие сверху. Пагинация через limit/offset.
-    """
+    """Список партий с разбивкой деталей по статусам. Свежие сверху."""
     stmt = (
         select(
             Batch.id,
@@ -86,18 +122,15 @@ async def list_batches(
         .offset(offset)
     )
     rows = (await session.execute(stmt)).all()
-
     return [
         BatchListItem(
-            id=row.id,
-            part_type=row.part_type,
-            created_at=row.created_at,
-            total_parts=row.total_parts,
-            pending_count=row.pending_count,
-            active_count=row.active_count,
-            absorbed_count=row.absorbed_count,
+            id=r.id, part_type=r.part_type, created_at=r.created_at,
+            total_parts=r.total_parts,
+            pending_count=r.pending_count,
+            active_count=r.active_count,
+            absorbed_count=r.absorbed_count,
         )
-        for row in rows
+        for r in rows
     ]
 
 
@@ -110,20 +143,13 @@ async def get_batch(
     batch_id: UUID,
     session: AsyncSession = Depends(get_session),
 ) -> BatchDetail:
-    """Детали партии + полный список её деталей.
-
-    Без пагинации внутри партии — обычно 50-500 деталей, фронту это норм.
-    Если в будущем партии станут гигантскими — добавим limit/offset.
-    """
+    """Детали партии + полный список её деталей."""
     batch = (await session.execute(
         select(Batch).where(Batch.id == batch_id)
     )).scalar_one_or_none()
 
     if batch is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Batch {batch_id} not found",
-        )
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Batch {batch_id} not found")
 
     parts = (await session.execute(
         select(Part).where(Part.batch_id == batch_id).order_by(Part.id)
@@ -134,4 +160,59 @@ async def get_batch(
         part_type=batch.part_type,
         created_at=batch.created_at,
         parts=[BatchPartItem.model_validate(p) for p in parts],
+    )
+
+
+@router.post(
+    "",
+    response_model=BatchCreatedResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_role(UserRole.warehouse))],
+)
+async def create_batch(
+    body: CreateBatchRequest,
+    session: AsyncSession = Depends(get_session),
+) -> BatchCreatedResponse:
+    """Создать партию + N pending-деталей с авто-генерацией ID.
+
+    Решение №30: кладовщик выбирает тип и количество, бэк создаёт batch
+    и N parts в статусе pending, возвращает их IDs (фронт отправит на термопринтер).
+
+    Нумерация: следующие номера после max существующего для этого типа.
+    Например, если есть D-0001..D-0050 — новая партия из 100 создаст D-0051..D-0150.
+    Формат — 4 цифры с ведущими нулями (D-0001). При переполнении (>9999) формат
+    расширится естественно (D-10000) — лексическая сортировка пострадает, но
+    числовая (cast to int) работает корректно.
+    """
+    # 1. Узнать следующие номера для этого типа
+    numbers = await _next_part_numbers(session, body.part_type, body.quantity)
+
+    # 2. Создать batch (flush для получения batch.id перед созданием parts)
+    batch = Batch(part_type=body.part_type)
+    session.add(batch)
+    await session.flush()
+
+    # 3. Создать parts с авто-генерированными IDs
+    part_ids = [f"{body.part_type}-{n:04d}" for n in numbers]
+    session.add_all([
+        Part(
+            id=pid,
+            base_id=pid,
+            version=0,
+            type=body.part_type,
+            status=PartStatus.pending,
+            parents=[],
+            batch_id=batch.id,
+        )
+        for pid in part_ids
+    ])
+
+    await session.commit()
+    await session.refresh(batch)
+
+    return BatchCreatedResponse(
+        id=batch.id,
+        part_type=batch.part_type,
+        created_at=batch.created_at,
+        part_ids=part_ids,
     )
