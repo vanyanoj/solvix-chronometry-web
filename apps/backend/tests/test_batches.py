@@ -1,8 +1,14 @@
-"""Тесты эндпоинтов batches (warehouse-блок)."""
+"""Тесты эндпоинтов batches (warehouse-блок).
+
+Покрытие:
+- GET /batches: auth (401/403), базовый 200, валидация пагинации, счётчики статусов
+- GET /batches/{id}: auth (401/403), 404 на несуществующую, 200 с полным детализом
+"""
 
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from uuid import uuid4
 
 import pytest_asyncio
 from httpx import AsyncClient
@@ -18,8 +24,7 @@ from solvix_chronometry.uuid_v7 import uuid7
 async def populated_batch() -> AsyncIterator[tuple[Batch, list[Part]]]:
     """
     Batch с уникальным part_type + 5 деталей в разных статусах:
-    2 pending, 2 active, 1 absorbed. Уникальный part_type чтобы найти
-    нашу партию в списке среди возможных других.
+    2 pending, 2 active, 1 absorbed.
     """
     unique_type = f"FIXT-{uuid7().hex[:8]}"
 
@@ -63,38 +68,35 @@ async def populated_batch() -> AsyncIterator[tuple[Batch, list[Part]]]:
             await session.execute(delete(Batch).where(Batch.id == batch_id))
 
 
-async def test_no_token_returns_401(client: AsyncClient) -> None:
+# === GET /batches (list) ===
+
+async def test_list_no_token_returns_401(client: AsyncClient) -> None:
     response = await client.get("/api/v1/batches")
     assert response.status_code == 401
 
 
-async def test_supervisor_role_forbidden(supervisor_client: AsyncClient) -> None:
+async def test_list_supervisor_role_forbidden(supervisor_client: AsyncClient) -> None:
     response = await supervisor_client.get("/api/v1/batches")
     assert response.status_code == 403
 
 
-async def test_basic_list_returns_200(warehouse_client: AsyncClient) -> None:
-    """Базовый запрос → 200 и массив (даже если пусто)."""
+async def test_list_basic_returns_200(warehouse_client: AsyncClient) -> None:
     response = await warehouse_client.get("/api/v1/batches")
     assert response.status_code == 200, response.text
     assert isinstance(response.json(), list)
 
 
-async def test_pagination_validation(warehouse_client: AsyncClient) -> None:
-    """limit и offset вне диапазона → 422 от FastAPI-валидации."""
+async def test_list_pagination_validation(warehouse_client: AsyncClient) -> None:
     assert (await warehouse_client.get("/api/v1/batches?limit=0")).status_code == 422
     assert (await warehouse_client.get("/api/v1/batches?limit=500")).status_code == 422
     assert (await warehouse_client.get("/api/v1/batches?offset=-1")).status_code == 422
 
 
-async def test_status_counts_correct(
+async def test_list_status_counts_correct(
     warehouse_client: AsyncClient,
     populated_batch: tuple[Batch, list[Part]],
 ) -> None:
-    """Партия с 2 pending + 2 active + 1 absorbed → правильные счётчики."""
     batch, _ = populated_batch
-
-    # Берём limit побольше чтобы наша партия точно попала
     response = await warehouse_client.get("/api/v1/batches?limit=200")
     assert response.status_code == 200
 
@@ -107,3 +109,47 @@ async def test_status_counts_correct(
     assert our["pending_count"] == 2
     assert our["active_count"] == 2
     assert our["absorbed_count"] == 1
+
+
+# === GET /batches/{id} (detail) ===
+
+async def test_detail_no_token_returns_401(client: AsyncClient) -> None:
+    response = await client.get(f"/api/v1/batches/{uuid4()}")
+    assert response.status_code == 401
+
+
+async def test_detail_supervisor_role_forbidden(supervisor_client: AsyncClient) -> None:
+    response = await supervisor_client.get(f"/api/v1/batches/{uuid4()}")
+    assert response.status_code == 403
+
+
+async def test_detail_unknown_batch_returns_404(warehouse_client: AsyncClient) -> None:
+    response = await warehouse_client.get(f"/api/v1/batches/{uuid4()}")
+    assert response.status_code == 404
+
+
+async def test_detail_returns_batch_with_all_parts(
+    warehouse_client: AsyncClient,
+    populated_batch: tuple[Batch, list[Part]],
+) -> None:
+    """Запрос конкретной партии возвращает её метаданные + все 5 деталей."""
+    batch, parts = populated_batch
+    response = await warehouse_client.get(f"/api/v1/batches/{batch.id}")
+    assert response.status_code == 200, response.text
+
+    data = response.json()
+    assert data["id"] == str(batch.id)
+    assert data["part_type"] == batch.part_type
+    assert "created_at" in data
+
+    returned_parts = data["parts"]
+    assert len(returned_parts) == 5
+
+    statuses = sorted(p["status"] for p in returned_parts)
+    assert statuses == ["absorbed", "active", "active", "pending", "pending"]
+
+    # Проверим одну деталь полностью — все ожидаемые поля
+    sample = returned_parts[0]
+    expected_keys = {"id", "base_id", "version", "status", "parents",
+                     "station_id", "shift_id", "created_at"}
+    assert set(sample.keys()) == expected_keys
