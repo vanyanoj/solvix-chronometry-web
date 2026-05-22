@@ -1,6 +1,6 @@
 """Parts endpoints — детали (warehouse-блок).
 
-API-контракт — Обсидиан → Решения №84 (warehouse block) и №3-9 (QR/наследование).
+API-контракт — Обсидиан → Решения №84 (warehouse) и №3-9 (QR/наследование), №30-31 (приёмка).
 """
 from datetime import datetime
 from uuid import UUID
@@ -47,10 +47,40 @@ async def get_part(
     part_id: str,
     session: AsyncSession = Depends(get_session),
 ) -> Part:
-    """Получить деталь по ID.
+    """Получить деталь по ID. ID — строковый композит (`D-0001` или `D-0001.2`)."""
+    part = (await session.execute(
+        select(Part).where(Part.id == part_id)
+    )).scalar_one_or_none()
 
-    ID — строковый композит вида `D-0001` или `D-0001.2`.
-    Возвращает 404 если деталь не найдена.
+    if part is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Part {part_id!r} not found",
+        )
+
+    return part
+
+
+@router.post(
+    "/{part_id}/confirm",
+    response_model=PartResponse,
+    dependencies=[Depends(require_role(UserRole.warehouse))],
+)
+async def confirm_part(
+    part_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> Part:
+    """Подтвердить деталь (pending → active) — кладовщик отсканировал QR.
+
+    Решение №30, шаг 5: «Сканирует каждый QR по одному → каждая деталь получает
+    статус `active`». Это самый горячий эндпоинт кладовщика — нажимается на каждой
+    физической детали при приёмке.
+
+    Ответы:
+    - 200: деталь была pending, переведена в active
+    - 404: деталь не найдена в БД
+    - 409: деталь уже active (повторный скан — UX-сигнал кладовщику)
+           или absorbed (использована в сборке, подтвердить нельзя)
     """
     part = (await session.execute(
         select(Part).where(Part.id == part_id)
@@ -61,5 +91,22 @@ async def get_part(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Part {part_id!r} not found",
         )
+
+    if part.status == PartStatus.active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Part {part_id!r} is already active",
+        )
+
+    if part.status == PartStatus.absorbed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Part {part_id!r} is absorbed (used in assembly) and cannot be confirmed",
+        )
+
+    # status == pending → переводим в active
+    part.status = PartStatus.active
+    await session.commit()
+    await session.refresh(part)
 
     return part
