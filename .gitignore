@@ -56,3 +56,6 @@ pnpm-debug.log*
 # --- Docker volumes (если кто-то решит хранить рядом) ---
 postgres_data/
 mosquitto_data/
+
+# Backup files
+*.bak
