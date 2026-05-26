@@ -13,39 +13,28 @@
                 #0a0a0c;
             color: #e5e5e5;
             min-height: 100vh;
-            padding: 48px 24px;
+            padding: 32px 24px;
             font-feature-settings: "tnum" 1, "ss01" 1;
         }
 
-        header { text-align: center; margin-bottom: 64px; }
+        header { text-align: center; margin-bottom: 24px; }
 
         h1 {
-            font-size: 1.875rem;
-            font-weight: 600;
+            font-size: 1.75rem; font-weight: 600;
             background: linear-gradient(180deg, #fafafa 0%, #a3a3a3 100%);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            margin-bottom: 12px;
-            letter-spacing: -0.02em;
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+            margin-bottom: 8px; letter-spacing: -0.02em;
         }
 
         .subtitle {
-            color: #737373;
-            font-size: 0.8125rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
+            color: #737373; font-size: 0.75rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 0.15em;
+            display: inline-flex; align-items: center; gap: 10px;
         }
 
         .live-dot {
-            width: 8px;
-            height: 8px;
-            background: #22c55e;
-            border-radius: 50%;
+            width: 8px; height: 8px;
+            background: #22c55e; border-radius: 50%;
             box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
             animation: pulse 2s ease-in-out infinite;
         }
@@ -55,185 +44,352 @@
             50% { opacity: 0.4; transform: scale(0.85); }
         }
 
-        .pyramid {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 32px;
-            max-width: 900px;
+        /* Легенда */
+        .legend {
+            display: flex; justify-content: center; gap: 24px;
+            margin: 16px auto 32px; flex-wrap: wrap;
+            font-size: 0.8125rem;
+        }
+        .legend-item { display: inline-flex; align-items: center; gap: 8px; color: #a3a3a3; }
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .legend-dot.working   { background: #22c55e; box-shadow: 0 0 6px rgba(34, 197, 94, 0.5); }
+        .legend-dot.scanning  { background: #3b82f6; box-shadow: 0 0 6px rgba(59, 130, 246, 0.5); }
+        .legend-dot.finishing { background: #F59E0B; box-shadow: 0 0 6px rgba(245, 158, 11, 0.5); }
+        .legend-dot.outgoing  { background: #06b6d4; box-shadow: 0 0 6px rgba(6, 182, 212, 0.5); }
+        .legend-dot.break     { background: #a78bfa; box-shadow: 0 0 6px rgba(167, 139, 250, 0.5); }
+        .legend-dot.idle      { background: #404040; }
+
+        /* Главный grid: пирамида + event log */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 24px;
+            max-width: 1320px;
             margin: 0 auto;
         }
 
-        .row { display: flex; gap: 32px; justify-content: center; width: 100%; }
-        .row.middle { justify-content: space-between; padding: 0 96px; }
+        @media (max-width: 1100px) {
+            .main-grid { grid-template-columns: 1fr; }
+        }
 
+        /* Пирамида */
+        .pyramid-wrap {
+            position: relative;
+            display: flex; flex-direction: column; align-items: center;
+            gap: 56px;
+            padding: 24px 0;
+        }
+
+        .pyramid-arrows {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .row { display: flex; gap: 48px; justify-content: center; width: 100%; z-index: 1; position: relative; }
+        .row.middle { justify-content: space-between; padding: 0 64px; }
+
+        /* Карточка */
         .card {
             background: linear-gradient(180deg, #1a1a1e 0%, #141417 100%);
             border: 1px solid #2a2a30;
-            border-radius: 16px;
-            padding: 22px 24px 24px;
-            width: 320px;
+            border-radius: 14px;
+            padding: 18px 20px;
+            width: 290px;
             box-shadow:
                 0 4px 24px rgba(0, 0, 0, 0.4),
                 inset 0 1px 0 rgba(255, 255, 255, 0.03);
-            transition:
-                border-color 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-                transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-                box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-            position: relative;
-            overflow: hidden;
+            transition: border-color 0.5s, transform 0.5s, box-shadow 0.5s;
+            position: relative; overflow: hidden;
         }
 
         .card::before {
-            content: "";
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 2px;
-            background: transparent;
-            transition: background 0.5s;
+            content: ""; position: absolute;
+            top: 0; left: 0; right: 0; height: 2px;
+            background: transparent; transition: background 0.5s;
         }
 
         .card.fresh {
             border-color: #F59E0B;
             transform: translateY(-3px);
-            box-shadow:
-                0 12px 40px rgba(245, 158, 11, 0.18),
-                inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            box-shadow: 0 12px 40px rgba(245, 158, 11, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
         }
+        .card.fresh::before { background: linear-gradient(90deg, transparent, #F59E0B, transparent); }
 
-        .card.fresh::before {
-            background: linear-gradient(90deg, transparent, #F59E0B, transparent);
+        .card.anomaly {
+            border-color: #ef4444 !important;
+            animation: pulseRed 1.5s ease-in-out infinite;
+        }
+        .card.anomaly::before { background: linear-gradient(90deg, transparent, #ef4444, transparent); }
+
+        @keyframes pulseRed {
+            0%, 100% { box-shadow: 0 12px 40px rgba(239, 68, 68, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+            50%      { box-shadow: 0 12px 60px rgba(239, 68, 68, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
         }
 
         .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 22px;
-            padding-bottom: 18px;
-            border-bottom: 1px solid #232328;
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid #232328;
         }
-
-        .card-title { font-size: 1.0625rem; font-weight: 600; color: #fafafa; letter-spacing: -0.01em; }
-
+        .card-title { font-size: 0.95rem; font-weight: 600; color: #fafafa; letter-spacing: -0.01em; }
         .card-tier {
-            font-size: 0.6rem;
-            color: #a3a3a3;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-            background: #1f1f24;
-            border: 1px solid #2a2a30;
-            padding: 4px 10px;
-            border-radius: 6px;
+            font-size: 0.58rem; color: #a3a3a3; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.14em;
+            background: #1f1f24; border: 1px solid #2a2a30;
+            padding: 3px 8px; border-radius: 5px;
         }
+
+        .operator {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 14px; padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        .operator-avatar {
+            width: 32px; height: 32px; border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 600; font-size: 0.75rem; color: #fafafa;
+            flex-shrink: 0;
+        }
+        .operator-info { flex: 1; min-width: 0; }
+        .operator-name { font-size: 0.85rem; font-weight: 600; color: #fafafa; line-height: 1.2; }
+        .operator-role { font-size: 0.7rem; color: #737373; margin-top: 2px; }
+        .operator.empty .operator-avatar { background: #2a2a30; color: #525252; }
+        .operator.empty .operator-name { color: #525252; font-style: italic; font-weight: 500; }
 
         .status {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            margin-bottom: 22px;
-            padding: 14px 16px;
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 12px; padding: 12px 14px;
             background: rgba(255, 255, 255, 0.015);
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.04);
         }
-
         .status-dot {
-            width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
-            transition: all 0.4s;
+            width: 10px; height: 10px; border-radius: 50%;
+            flex-shrink: 0; transition: all 0.4s;
         }
-
-        .status-dot.working   { background: #22c55e; box-shadow: 0 0 16px rgba(34, 197, 94, 0.6); }
-        .status-dot.scanning  { background: #3b82f6; box-shadow: 0 0 16px rgba(59, 130, 246, 0.6); }
-        .status-dot.finishing { background: #F59E0B; box-shadow: 0 0 16px rgba(245, 158, 11, 0.6); }
-        .status-dot.outgoing  { background: #06b6d4; box-shadow: 0 0 16px rgba(6, 182, 212, 0.6); }
-        .status-dot.idle      { background: #404040; box-shadow: none; }
-
-        .status-text { font-size: 0.9375rem; font-weight: 600; color: #fafafa; letter-spacing: -0.01em; }
+        .status-dot.working   { background: #22c55e; box-shadow: 0 0 12px rgba(34, 197, 94, 0.6); }
+        .status-dot.scanning  { background: #3b82f6; box-shadow: 0 0 12px rgba(59, 130, 246, 0.6); }
+        .status-dot.finishing { background: #F59E0B; box-shadow: 0 0 12px rgba(245, 158, 11, 0.6); }
+        .status-dot.outgoing  { background: #06b6d4; box-shadow: 0 0 12px rgba(6, 182, 212, 0.6); }
+        .status-dot.break     { background: #a78bfa; box-shadow: 0 0 12px rgba(167, 139, 250, 0.6); }
+        .status-dot.idle      { background: #404040; }
+        .status-text { font-size: 0.875rem; font-weight: 600; color: #fafafa; }
         .status-text.idle { color: #737373; font-weight: 500; }
 
-        .meta { display: flex; flex-direction: column; gap: 10px; }
-        .meta-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.8125rem; }
-        .meta-label { color: #737373; font-weight: 500; }
-        .meta-value { color: #d4d4d4; font-weight: 500; }
-        .meta-value.mono { font-family: "SF Mono", "JetBrains Mono", Menlo, Monaco, monospace; font-size: 0.75rem; color: #a3a3a3; }
-        .meta-value.empty { color: #525252; font-style: italic; }
+        .processing {
+            display: flex; flex-direction: column; gap: 8px;
+            font-size: 0.8125rem;
+        }
+        .processing-row { display: flex; justify-content: space-between; align-items: baseline; }
+        .processing-label { color: #737373; font-weight: 500; }
+        .processing-value { color: #d4d4d4; font-weight: 500; }
+        .processing-value.mono { font-family: "SF Mono", Menlo, monospace; font-size: 0.75rem; color: #a3a3a3; }
+        .processing-value.empty { color: #525252; font-style: italic; }
+
+        /* Event log */
+        .event-log-panel {
+            background: linear-gradient(180deg, #1a1a1e 0%, #141417 100%);
+            border: 1px solid #2a2a30; border-radius: 14px;
+            padding: 18px; height: fit-content;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+            position: sticky; top: 24px;
+        }
+        .event-log-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 14px; padding-bottom: 12px;
+            border-bottom: 1px solid #232328;
+        }
+        .event-log-title {
+            font-size: 0.7rem; font-weight: 600; color: #fafafa;
+            text-transform: uppercase; letter-spacing: 0.1em;
+        }
+        .event-log-count {
+            font-size: 0.7rem; color: #737373;
+            padding: 2px 7px; background: #1f1f24;
+            border-radius: 5px; border: 1px solid #2a2a30;
+        }
+        .event-log {
+            display: flex; flex-direction: column;
+            max-height: 560px; overflow-y: auto;
+            gap: 6px;
+        }
+        .event-log-empty { padding: 20px; text-align: center; color: #525252; font-size: 0.8rem; font-style: italic; }
+        .event-log-entry {
+            padding: 8px 10px; border-radius: 6px;
+            background: rgba(255, 255, 255, 0.015);
+            border-left: 2px solid transparent;
+            font-size: 0.78rem; line-height: 1.4;
+            transition: background 0.4s;
+        }
+        .event-log-entry.new { background: rgba(245, 158, 11, 0.08); border-left-color: #F59E0B; }
+        .event-log-time { color: #525252; font-family: "SF Mono", Menlo, monospace; font-size: 0.7rem; margin-right: 8px; }
+        .event-log-text { color: #d4d4d4; }
+        .event-log-text strong { color: #fafafa; font-weight: 600; }
+
+        /* Лента инцидентов */
+        .incidents {
+            max-width: 1320px; margin: 32px auto 0;
+            padding: 20px;
+            background: linear-gradient(180deg, #1a1a1e 0%, #141417 100%);
+            border: 1px solid #2a2a30; border-radius: 14px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+        }
+        .incidents-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #232328; }
+        .incidents-title { font-size: 0.8rem; font-weight: 600; color: #fafafa; text-transform: uppercase; letter-spacing: 0.1em; }
+        .incidents-count { font-size: 0.7rem; color: #737373; padding: 3px 9px; background: #1f1f24; border-radius: 5px; border: 1px solid #2a2a30; }
+        .incidents-list { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; }
+        .incident { display: grid; grid-template-columns: 110px 160px 1fr 90px; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 6px; background: rgba(255, 255, 255, 0.015); border: 1px solid rgba(255, 255, 255, 0.04); font-size: 0.8rem; transition: all 0.3s; }
+        .incident.new { border-color: #ef4444; animation: incidentFlash 1s ease-out; }
+        @keyframes incidentFlash { 0% { background: rgba(239, 68, 68, 0.2); } 100% { background: rgba(255, 255, 255, 0.015); } }
+        .incident-kind { font-family: "SF Mono", monospace; font-size: 0.68rem; font-weight: 600; padding: 4px 8px; border-radius: 5px; text-transform: uppercase; letter-spacing: 0.06em; text-align: center; }
+        .kind-norm_exceeded   { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+        .kind-pause_exceeded  { background: rgba(167, 139, 250, 0.15); color: #c4b5fd; }
+        .kind-station_idle    { background: rgba(115, 115, 115, 0.2); color: #a3a3a3; }
+        .kind-transit_stuck   { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+        .kind-error           { background: rgba(239, 68, 68, 0.25); color: #ef4444; }
+        .incident-station { color: #d4d4d4; font-weight: 500; }
+        .incident-info { color: #a3a3a3; font-family: "SF Mono", monospace; font-size: 0.74rem; }
+        .incident-time { color: #525252; font-family: "SF Mono", monospace; font-size: 0.74rem; text-align: right; }
+        .incidents-empty { text-align: center; padding: 24px 16px; color: #525252; font-size: 0.85rem; font-style: italic; }
 
         .footer {
-            text-align: center; color: #404040; font-size: 0.7rem;
-            margin-top: 64px; font-family: "SF Mono", monospace; letter-spacing: 0.05em;
+            text-align: center; color: #404040; font-size: 0.68rem;
+            margin-top: 32px; font-family: "SF Mono", monospace; letter-spacing: 0.05em;
         }
     </style>
 </head>
 <body>
     <header>
         <h1>Solvix Chronometry</h1>
-        <div class="subtitle"><span class="live-dot"></span>Дашборд старшего · Live (WebSocket)</div>
+        <div class="subtitle"><span class="live-dot"></span>Дашборд старшего · Live</div>
     </header>
 
-    <div class="pyramid">
-        <div class="row top"><div class="card" id="card-4"></div></div>
-        <div class="row middle">
-            <div class="card" id="card-2"></div>
-            <div class="card" id="card-3"></div>
+    <div class="legend">
+        <span class="legend-item"><span class="legend-dot working"></span>Работает</span>
+        <span class="legend-item"><span class="legend-dot scanning"></span>Принимает деталь</span>
+        <span class="legend-item"><span class="legend-dot finishing"></span>Готов к выгрузке</span>
+        <span class="legend-item"><span class="legend-dot outgoing"></span>Отгружено</span>
+        <span class="legend-item"><span class="legend-dot break"></span>На паузе</span>
+        <span class="legend-item"><span class="legend-dot idle"></span>Простой</span>
+    </div>
+
+    <div class="main-grid">
+        <div class="pyramid-wrap" id="pyramid-wrap">
+            <svg class="pyramid-arrows" id="pyramid-arrows" preserveAspectRatio="none"></svg>
+            <div class="row top"><div class="card" id="card-4"></div></div>
+            <div class="row middle">
+                <div class="card" id="card-2"></div>
+                <div class="card" id="card-3"></div>
+            </div>
+            <div class="row bottom"><div class="card" id="card-1"></div></div>
         </div>
-        <div class="row bottom"><div class="card" id="card-1"></div></div>
+
+        <div class="event-log-panel">
+            <div class="event-log-header">
+                <span class="event-log-title">📜 Поток событий</span>
+                <span class="event-log-count" id="event-log-count">0</span>
+            </div>
+            <div class="event-log" id="event-log">
+                <div class="event-log-empty">События появятся здесь</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="incidents">
+        <div class="incidents-header">
+            <span class="incidents-title">📋 Лента инцидентов</span>
+            <span class="incidents-count" id="incidents-count">—</span>
+        </div>
+        <div class="incidents-list" id="incidents-list">
+            <div class="incidents-empty">Инцидентов нет</div>
+        </div>
     </div>
 
     <div class="footer" id="updated">—</div>
 
     <script>
         const API_URL = '/api/v1/dashboard/stations';
+        const INCIDENTS_URL = '/api/v1/dashboard/incidents';
+        const AUTH_URL = '/api/v1/auth/login';
+        const SUPERVISOR_PASS_CODE = 'TEST-002';
         const WS_PROTOCOL = location.protocol === 'https:' ? 'wss:' : 'ws:';
         const WS_URL = `${WS_PROTOCOL}//${location.host}/api/v1/ws/events`;
-        const RECONNECT_DELAY_MS = 2000;
-        const TICK_INTERVAL_MS = 1000;
+        const TICK_MS = 1000;
+        const INCIDENTS_POLL_MS = 4000;
+        const ANOMALY_FLASH_MS = 8000;
+        const EVENT_LOG_MAX = 30;
 
-        const cardMap = {
-            'Test Station 1': { id: 'card-1', tier: 'Вход' },
-            'Test Station 2': { id: 'card-2', tier: 'Среднее' },
-            'Test Station 3': { id: 'card-3', tier: 'Среднее' },
-            'Test Station 4': { id: 'card-4', tier: 'Выход' },
+        const cardMapByName = {
+            'Test Station 1': { id: 'card-1', tier: 'Вход', shortName: 'Станок 1' },
+            'Test Station 2': { id: 'card-2', tier: 'Среднее', shortName: 'Станок 2' },
+            'Test Station 3': { id: 'card-3', tier: 'Среднее', shortName: 'Станок 3' },
+            'Test Station 4': { id: 'card-4', tier: 'Выход', shortName: 'Станок 4' },
         };
 
         const statusMap = {
-            'scan_in':  { cls: 'scanning',  text: 'Принимает деталь' },
-            'start':    { cls: 'working',   text: 'В работе' },
-            'stop':     { cls: 'finishing', text: 'Готов к выгрузке' },
-            'scan_out': { cls: 'outgoing',  text: 'Отгружено' },
+            'scan_in':     { cls: 'scanning',  text: 'Принимает деталь' },
+            'start':       { cls: 'working',   text: 'В работе' },
+            'stop':        { cls: 'finishing', text: 'Готов к выгрузке' },
+            'scan_out':    { cls: 'outgoing',  text: 'Отгружено' },
+            'break_start': { cls: 'break',     text: 'На паузе' },
+            'break_end':   { cls: 'finishing', text: 'Вернулся с паузы' },
         };
 
-        // Локальный state — обновляется из initial fetch + WS-событий
         let stations = [];
         let stationById = {};
         const previousEvent = {};
+        const stationAnomalyTimers = {};
+        const seenIncidentIds = new Set();
+        const eventLog = [];
+        let jwtToken = null;
 
-        // === Утилиты форматирования ===
-
+        // === Утилиты ===
         function fmtTime(iso) {
             const d = new Date(iso);
             return [d.getHours(), d.getMinutes(), d.getSeconds()]
                 .map(n => String(n).padStart(2, '0')).join(':');
         }
-
-        function secondsAgo(iso) {
-            return Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-        }
-
+        function secondsAgo(iso) { return Math.floor((Date.now() - new Date(iso).getTime()) / 1000); }
         function formatDuration(s) {
             if (s < 60) return `${s} с`;
             return `${Math.floor(s / 60)} мин ${s % 60} с`;
         }
-
-        function setStatus(text) {
-            document.getElementById('updated').textContent = text;
+        function setStatus(t) { document.getElementById('updated').textContent = t; }
+        function operatorInitials(name) {
+            const parts = name.trim().split(/\s+/);
+            if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+            return name.slice(0, 2).toUpperCase();
+        }
+        function lastName(name) {
+            return name.trim().split(/\s+/)[0];
         }
 
-        // === Рендер карточки ===
+        // === Описание события на русском ===
+        function describeEvent(evt) {
+            const station = stationById[evt.station_id];
+            const cfg = station ? cardMapByName[station.name] : null;
+            const stationLabel = cfg ? cfg.shortName : (station ? station.name : 'станок');
+            const op = station && station.operator ? lastName(station.operator.full_name) : 'Оператор';
+            const part = evt.part_id ? ` ${evt.part_id}` : '';
 
+            switch (evt.event_type) {
+                case 'scan_in':     return `<strong>${op}</strong> принял деталь${part} на ${stationLabel}`;
+                case 'start':       return `<strong>${op}</strong> начал работу${part ? ' над' + part : ''} на ${stationLabel}`;
+                case 'stop':        return `<strong>${op}</strong> завершил работу на ${stationLabel}`;
+                case 'scan_out':    return `<strong>${op}</strong> отгрузил деталь${part} со ${stationLabel}`;
+                case 'break_start': return `<strong>${op}</strong> ушёл на перекур (${stationLabel})`;
+                case 'break_end':   return `<strong>${op}</strong> вернулся с перекура (${stationLabel})`;
+                case 'anomaly':    return `🚨 Аномалия на ${stationLabel}`;
+                case 'error':      return `⚠️ Ошибка на ${stationLabel}`;
+                default:           return `${evt.event_type} на ${stationLabel}`;
+            }
+        }
+
+        // === Карточка ===
         function renderCard(station) {
-            const cfg = cardMap[station.name];
+            const cfg = cardMapByName[station.name];
             if (!cfg) return;
             const el = document.getElementById(cfg.id);
             if (!el) return;
@@ -242,43 +398,54 @@
                 ? (statusMap[station.last_event.type] || { cls: 'idle', text: station.last_event.type })
                 : { cls: 'idle', text: 'Простой' };
 
-            const operator = station.operator
-                ? `<span class="meta-value">${station.operator.full_name}</span>`
-                : `<span class="meta-value empty">не назначен</span>`;
+            const operatorBlock = station.operator
+                ? `<div class="operator">
+                       <div class="operator-avatar">${operatorInitials(station.operator.full_name)}</div>
+                       <div class="operator-info">
+                           <div class="operator-name">${station.operator.full_name}</div>
+                           <div class="operator-role">Оператор</div>
+                       </div>
+                   </div>`
+                : `<div class="operator empty">
+                       <div class="operator-avatar">—</div>
+                       <div class="operator-info">
+                           <div class="operator-name">не назначен</div>
+                           <div class="operator-role">смена не открыта</div>
+                       </div>
+                   </div>`;
 
-            const lastEventBlock = station.last_event
-                ? `
-                    <div class="meta-row">
-                        <span class="meta-label">Длится</span>
-                        <span class="meta-value mono">${formatDuration(secondsAgo(station.last_event.at))}</span>
-                    </div>
-                    <div class="meta-row">
-                        <span class="meta-label">Время события</span>
-                        <span class="meta-value mono">${fmtTime(station.last_event.at)}</span>
-                    </div>`
-                : `
-                    <div class="meta-row">
-                        <span class="meta-label">События</span>
-                        <span class="meta-value empty">пока нет</span>
-                    </div>`;
+            const processingBlock = station.last_event
+                ? `<div class="processing">
+                       <div class="processing-row">
+                           <span class="processing-label">Деталь</span>
+                           <span class="processing-value mono">${station.last_event.part_id || '—'}</span>
+                       </div>
+                       <div class="processing-row">
+                           <span class="processing-label">Длится</span>
+                           <span class="processing-value mono">${formatDuration(secondsAgo(station.last_event.at))}</span>
+                       </div>
+                   </div>`
+                : `<div class="processing">
+                       <div class="processing-row">
+                           <span class="processing-label">События</span>
+                           <span class="processing-value empty">пока нет</span>
+                       </div>
+                   </div>`;
 
+            const wasAnomaly = el.classList.contains('anomaly');
             el.innerHTML = `
                 <div class="card-header">
-                    <span class="card-title">${station.name}</span>
+                    <span class="card-title">${cfg.shortName}</span>
                     <span class="card-tier">${cfg.tier}</span>
                 </div>
+                ${operatorBlock}
                 <div class="status">
                     <span class="status-dot ${status.cls}"></span>
                     <span class="status-text ${status.cls === 'idle' ? 'idle' : ''}">${status.text}</span>
                 </div>
-                <div class="meta">
-                    <div class="meta-row">
-                        <span class="meta-label">Оператор</span>
-                        ${operator}
-                    </div>
-                    ${lastEventBlock}
-                </div>
+                ${processingBlock}
             `;
+            if (wasAnomaly) el.classList.add('anomaly');
 
             const eventKey = station.last_event ? station.last_event.at + station.last_event.type : null;
             if (eventKey && previousEvent[station.id] !== eventKey && previousEvent[station.id] !== undefined) {
@@ -288,8 +455,77 @@
             previousEvent[station.id] = eventKey;
         }
 
-        // === Initial load (REST) ===
+        function flashStationAnomaly(stationId) {
+            const station = stationById[stationId];
+            if (!station) return;
+            const cfg = cardMapByName[station.name];
+            if (!cfg) return;
+            const el = document.getElementById(cfg.id);
+            if (!el) return;
+            el.classList.add('anomaly');
+            if (stationAnomalyTimers[stationId]) clearTimeout(stationAnomalyTimers[stationId]);
+            stationAnomalyTimers[stationId] = setTimeout(() => el.classList.remove('anomaly'), ANOMALY_FLASH_MS);
+        }
 
+        // === Event log ===
+        function appendToEventLog(evt) {
+            const text = describeEvent(evt);
+            eventLog.unshift({ time: evt.timestamp, text, isNew: true });
+            if (eventLog.length > EVENT_LOG_MAX) eventLog.pop();
+            renderEventLog();
+            setTimeout(() => {
+                eventLog.forEach(e => e.isNew = false);
+                renderEventLog();
+            }, 2000);
+        }
+
+        function renderEventLog() {
+            const container = document.getElementById('event-log');
+            document.getElementById('event-log-count').textContent = eventLog.length;
+            if (eventLog.length === 0) {
+                container.innerHTML = '<div class="event-log-empty">События появятся здесь</div>';
+                return;
+            }
+            container.innerHTML = eventLog.map(e => `
+                <div class="event-log-entry ${e.isNew ? 'new' : ''}">
+                    <span class="event-log-time">${fmtTime(e.time)}</span>
+                    <span class="event-log-text">${e.text}</span>
+                </div>
+            `).join('');
+        }
+
+        // === Стрелки пирамиды (SVG) ===
+        function drawPyramidArrows() {
+            const svg = document.getElementById('pyramid-arrows');
+            const wrap = document.getElementById('pyramid-wrap');
+            const rect = wrap.getBoundingClientRect();
+            svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+
+            // Координаты центров карточек (примерные, под layout)
+            const cards = ['card-1', 'card-2', 'card-3', 'card-4'].map(id => {
+                const el = document.getElementById(id);
+                const r = el.getBoundingClientRect();
+                return {
+                    x: r.left - rect.left + r.width / 2,
+                    y: r.top - rect.top + r.height / 2,
+                };
+            });
+            const [c1, c2, c3, c4] = cards;
+
+            const lines = [
+                { from: c1, to: c2 },  // S1 → S2
+                { from: c1, to: c3 },  // S1 → S3
+                { from: c2, to: c4 },  // S2 → S4
+                { from: c3, to: c4 },  // S3 → S4
+            ];
+
+            svg.innerHTML = lines.map(({ from, to }) => `
+                <line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}"
+                      stroke="#2a2a30" stroke-width="1.5" stroke-dasharray="4 6" />
+            `).join('');
+        }
+
+        // === Initial load ===
         async function initialLoad() {
             try {
                 const res = await fetch(API_URL);
@@ -298,63 +534,105 @@
                 stationById = Object.fromEntries(stations.map(s => [s.id, s]));
                 stations.forEach(renderCard);
                 setStatus(`Initial load: ${fmtTime(new Date().toISOString())}`);
+                setTimeout(drawPyramidArrows, 100);
             } catch (err) {
                 setStatus(`Initial load error: ${err.message}`);
             }
         }
 
-        // === WS-обработка одного события ===
+        // === Login ===
+        async function login() {
+            try {
+                const res = await fetch(AUTH_URL, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({pass_code: SUPERVISOR_PASS_CODE}),
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                jwtToken = (await res.json()).access_token;
+                console.log('✓ Logged in');
+            } catch (err) {
+                console.warn('Login failed:', err.message);
+            }
+        }
 
-        function applyEvent(evt) {
-            const station = stationById[evt.station_id];
-            if (!station) {
-                console.warn('Unknown station_id in WS event:', evt.station_id);
+        // === Incidents polling ===
+        async function pollIncidents() {
+            if (!jwtToken) return;
+            try {
+                const res = await fetch(INCIDENTS_URL + '?limit=20', {
+                    headers: {'Authorization': 'Bearer ' + jwtToken},
+                });
+                if (res.status === 401) { jwtToken = null; await login(); return; }
+                if (!res.ok) return;
+                renderIncidents(await res.json());
+            } catch (err) { /* silent */ }
+        }
+
+        function renderIncidents(incidents) {
+            const container = document.getElementById('incidents-list');
+            document.getElementById('incidents-count').textContent = `${incidents.length} за 8 ч`;
+            if (incidents.length === 0) {
+                container.innerHTML = '<div class="incidents-empty">Инцидентов нет</div>';
                 return;
             }
-            station.last_event = {
-                type: evt.event_type,
-                at: evt.timestamp,
-                part_id: evt.part_id,
-            };
-            renderCard(station);
+            container.innerHTML = incidents.map(inc => {
+                const kind = (inc.details && inc.details.kind) || inc.event_type;
+                const isNew = !seenIncidentIds.has(inc.id);
+                if (isNew) { seenIncidentIds.add(inc.id); flashStationAnomaly(inc.station_id); }
+                const station = stationById[inc.station_id];
+                const cfg = station ? cardMapByName[station.name] : null;
+                const sName = cfg ? cfg.shortName : inc.station_name;
+                return `<div class="incident ${isNew ? 'new' : ''}">
+                    <span class="incident-kind kind-${kind}">${kind}</span>
+                    <span class="incident-station">${sName}</span>
+                    <span class="incident-info">${formatIncidentInfo(inc)}</span>
+                    <span class="incident-time">${fmtTime(inc.timestamp)}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function formatIncidentInfo(inc) {
+            const d = inc.details || {};
+            if (d.kind === 'norm_exceeded') return `операция ${Math.round(d.duration_actual_sec)}с > норматива ${Math.round(d.threshold_sec)}с`;
+            if (d.kind === 'pause_exceeded') return `${d.reason_code} ${Math.round(d.duration_actual_sec)}с > лимита ${d.max_duration_sec}с`;
+            if (d.kind === 'station_idle') return `простой ${Math.round(d.duration_actual_sec)}с`;
+            if (d.kind === 'transit_stuck') return `деталь ${inc.part_id} в транзите ${Math.round(d.duration_actual_sec)}с`;
+            return '—';
+        }
+
+        // === WS ===
+        function applyEvent(evt) {
+            const station = stationById[evt.station_id];
+            if (station) {
+                station.last_event = { type: evt.event_type, at: evt.timestamp, part_id: evt.part_id };
+                renderCard(station);
+            }
+            appendToEventLog(evt);
             setStatus(`Last event: ${fmtTime(new Date().toISOString())}`);
         }
 
-        // === WebSocket с auto-reconnect ===
-
         function connectWS() {
             const ws = new WebSocket(WS_URL);
-
             ws.onopen = () => console.log('✓ WS connected');
-
             ws.onmessage = (e) => {
-                try {
-                    const msg = JSON.parse(e.data);
-                    if (msg.type === 'event') applyEvent(msg);
-                } catch (err) {
-                    console.warn('WS parse error:', err);
-                }
+                try { const m = JSON.parse(e.data); if (m.type === 'event') applyEvent(m); }
+                catch {}
             };
-
-            ws.onclose = () => {
-                console.log(`WS disconnected, reconnect in ${RECONNECT_DELAY_MS}ms`);
-                setTimeout(connectWS, RECONNECT_DELAY_MS);
-            };
-
-            ws.onerror = (err) => {
-                console.warn('WS error:', err);
-                ws.close();
-            };
+            ws.onclose = () => setTimeout(connectWS, 2000);
+            ws.onerror = () => ws.close();
         }
 
-        // === Локальный 1-сек тик для обновления «Длится X с» (без сети) ===
+        // === Тики ===
+        setInterval(() => stations.forEach(s => { if (s.last_event) renderCard(s); }), TICK_MS);
+        window.addEventListener('resize', drawPyramidArrows);
 
-        setInterval(() => {
-            stations.forEach(s => { if (s.last_event) renderCard(s); });
-        }, TICK_INTERVAL_MS);
-
-        // Поехали
-        initialLoad().then(connectWS);
+        // === Поехали ===
+        initialLoad().then(login).then(() => {
+            connectWS();
+            pollIncidents();
+            setInterval(pollIncidents, INCIDENTS_POLL_MS);
+        });
     </script>
 </body>
 </html>

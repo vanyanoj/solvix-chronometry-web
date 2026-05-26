@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,7 +12,7 @@ from solvix_chronometry.watchdog.detectors import detect_norm_exceeded, detect_p
 
 logger = logging.getLogger(__name__)
 
-POLL_INTERVAL_SEC = 30
+POLL_INTERVAL_SEC = 5 if os.getenv("WATCHDOG_DEMO_MODE") == "1" else 30
 
 
 async def run_watchdog() -> None:

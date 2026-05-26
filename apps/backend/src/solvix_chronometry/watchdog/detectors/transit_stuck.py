@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
@@ -22,7 +23,7 @@ from solvix_chronometry.watchdog.helpers import create_anomaly_event
 
 logger = logging.getLogger(__name__)
 
-TRANSIT_STUCK_THRESHOLD_SEC = 5 * 60  # 5 минут
+TRANSIT_STUCK_THRESHOLD_SEC = 30 if os.getenv("WATCHDOG_DEMO_MODE") == "1" else 5 * 60  # 30 сек в демо, 5 мин на проде
 MAX_TRANSIT_AGE_HOURS = 2
 
 
