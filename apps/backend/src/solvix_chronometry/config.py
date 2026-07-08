@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     mqtt_host: str = "localhost"
     mqtt_port: int = 1883
 
+    # --- CORS ---
+    cors_origins: list[str] = Field(
+        default=["http://localhost:5173", "http://localhost:8000"],
+        description="Разрешённые origins для CORS (JSON-список в .env).",
+    )
+
     # --- JWT ---
     jwt_secret_key: str = Field(
         description="Секрет для подписи JWT-токенов (см. .env.example)",

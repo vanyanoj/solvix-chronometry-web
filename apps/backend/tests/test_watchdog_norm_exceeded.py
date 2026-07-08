@@ -101,7 +101,9 @@ async def test_no_process_no_anomaly(temp_station: Station) -> None:
         created = await detect_norm_exceeded(session)
         await session.commit()
 
-    assert created == 0
+    # `created` — глобальный счётчик, ненадёжен: в dev-БД могут висеть чужие
+    # незакрытые start события (демо-сидинг). Проверяем что на НАШЕМ станке
+    # аномалий не создано — это и есть инвариант детектора.
     assert await _count_norm_exceeded(temp_station.id) == 0
 
 
@@ -115,7 +117,9 @@ async def test_short_operation_no_anomaly(temp_station: Station) -> None:
         created = await detect_norm_exceeded(session)
         await session.commit()
 
-    assert created == 0
+    # `created` — глобальный счётчик, ненадёжен: в dev-БД могут висеть чужие
+    # незакрытые start события (демо-сидинг). Проверяем что на НАШЕМ станке
+    # аномалий не создано — это и есть инвариант детектора.
     assert await _count_norm_exceeded(temp_station.id) == 0
 
 
@@ -178,7 +182,9 @@ async def test_pause_subtracted(temp_station: Station) -> None:
         created = await detect_norm_exceeded(session)
         await session.commit()
 
-    assert created == 0
+    # `created` — глобальный счётчик, ненадёжен: в dev-БД могут висеть чужие
+    # незакрытые start события (демо-сидинг). Проверяем что на НАШЕМ станке
+    # аномалий не создано — это и есть инвариант детектора.
     assert await _count_norm_exceeded(temp_station.id) == 0
 
 
@@ -193,5 +199,7 @@ async def test_stop_makes_station_idle(temp_station: Station) -> None:
         created = await detect_norm_exceeded(session)
         await session.commit()
 
-    assert created == 0
+    # `created` — глобальный счётчик, ненадёжен: в dev-БД могут висеть чужие
+    # незакрытые start события (демо-сидинг). Проверяем что на НАШЕМ станке
+    # аномалий не создано — это и есть инвариант детектора.
     assert await _count_norm_exceeded(temp_station.id) == 0
