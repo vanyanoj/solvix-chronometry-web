@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,6 +39,22 @@ class Settings(BaseSettings):
 
     # --- App ---
     app_env: str = "development"
+
+    @model_validator(mode="after")
+    def _check_jwt_secret(self) -> "Settings":
+        placeholders = {
+            "replace_me_with_a_long_random_string",
+            "changeme",
+            "secret",
+            "dev",
+        }
+        if self.app_env != "development":
+            if self.jwt_secret_key in placeholders or len(self.jwt_secret_key) < 32:
+                raise ValueError(
+                    "jwt_secret_key is a known placeholder or too short (<32 chars). "
+                    "Generate one: python3 -c 'import secrets; print(secrets.token_urlsafe(48))'"
+                )
+        return self
 
     @property
     def is_dev(self) -> bool:
