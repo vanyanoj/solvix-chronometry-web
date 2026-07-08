@@ -13,6 +13,7 @@ import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy import delete, select
 
+from solvix_chronometry.auth.hashing import hash_pass_code
 from solvix_chronometry.db import SessionLocal
 from solvix_chronometry.models.enums import UserRole
 from solvix_chronometry.models.hierarchy import Line, Station
@@ -145,7 +146,7 @@ async def active_shift(
 async def _create_extra_operator() -> UUID:
     async with SessionLocal() as session:
         u = User(
-            pass_code=f"FIXT-OPX-{uuid7().hex[:6]}",
+            pass_code_hash=hash_pass_code(f"FIXT-OPX-{uuid7().hex[:6]}"),
             full_name="Extra Operator",
             role=UserRole.operator,
             active=True,

@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     jwt_secret_key: str = Field(
         description="Секрет для подписи JWT-токенов (см. .env.example)",
     )
+    pass_code_pepper: str = Field(
+        description="Секретный pepper для HMAC-хэширования pass_code (см. .env.example)",
+    )
     jwt_algorithm: str = "HS256"
     jwt_expires_min: int = 720  # 12 часов = одна смена
 
@@ -49,11 +52,14 @@ class Settings(BaseSettings):
             "dev",
         }
         if self.app_env != "development":
-            if self.jwt_secret_key in placeholders or len(self.jwt_secret_key) < 32:
-                raise ValueError(
-                    "jwt_secret_key is a known placeholder or too short (<32 chars). "
-                    "Generate one: python3 -c 'import secrets; print(secrets.token_urlsafe(48))'"
-                )
+            for name in ("jwt_secret_key", "pass_code_pepper"):
+                value = getattr(self, name)
+                if value in placeholders or len(value) < 32:
+                    raise ValueError(
+                        f"{name} is a known placeholder or too short (<32 chars). "
+                        "Generate one: python3 -c "
+                        "'import secrets; print(secrets.token_urlsafe(48))'"
+                    )
         return self
 
     @property

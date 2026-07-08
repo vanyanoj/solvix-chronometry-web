@@ -10,6 +10,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from solvix_chronometry.auth.hashing import hash_pass_code
 from solvix_chronometry.db import SessionLocal as async_session_factory
 from solvix_chronometry.models.enums import UserRole
 from solvix_chronometry.models.people import User
@@ -30,12 +31,14 @@ async def upsert_user(
     full_name: str,
     role: UserRole,
 ) -> str:
-    result = await session.execute(select(User).where(User.pass_code == pass_code))
+    result = await session.execute(
+        select(User).where(User.pass_code_hash == hash_pass_code(pass_code))
+    )
     user = result.scalar_one_or_none()
 
     if user is None:
         user = User(
-            pass_code=pass_code,
+            pass_code_hash=hash_pass_code(pass_code),
             full_name=full_name,
             role=role,
             active=True,
@@ -62,14 +65,14 @@ async def upsert_user(
 async def normalize_operators(session: AsyncSession) -> int:
     result = await session.execute(select(User))
     all_users = result.scalars().all()
-    spec_codes = set(USERS_SPEC.keys())
+    spec_hashes = {hash_pass_code(c): c for c in USERS_SPEC}
 
     changed = 0
     for u in all_users:
-        if u.pass_code in spec_codes:
+        if u.pass_code_hash in spec_hashes:
             continue
         if u.role != UserRole.operator:
-            log.info(f"normalize  {u.pass_code:<14} {u.role.value} → operator  {u.full_name}")
+            log.info(f"normalize  {u.full_name:<20} {u.role.value} → operator")
             u.role = UserRole.operator
             changed += 1
     return changed

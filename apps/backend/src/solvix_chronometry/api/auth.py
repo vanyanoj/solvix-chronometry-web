@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from solvix_chronometry.auth.dependencies import get_current_user
+from solvix_chronometry.auth.hashing import hash_pass_code
 from solvix_chronometry.auth.jwt import create_access_token
 from solvix_chronometry.auth.schemas import CurrentUserResponse, LoginRequest, TokenResponse
 from solvix_chronometry.config import settings
@@ -28,7 +29,10 @@ async def login(
     """Логин по pass_code → JWT для supervisor/warehouse."""
 
     result = await session.execute(
-        select(User).where(User.pass_code == payload.pass_code, User.active.is_(True))
+        select(User).where(
+            User.pass_code_hash == hash_pass_code(payload.pass_code),
+            User.active.is_(True),
+        )
     )
     user = result.scalar_one_or_none()
 

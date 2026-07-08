@@ -14,6 +14,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete
 
+from solvix_chronometry.auth.hashing import hash_pass_code
 from solvix_chronometry.auth.jwt import create_access_token
 from solvix_chronometry.db import SessionLocal
 from solvix_chronometry.main import app
@@ -28,10 +29,10 @@ from solvix_chronometry.uuid_v7 import uuid7
 
 async def _make_user(role: UserRole, prefix: str) -> User:
     """Создаёт юзера с уникальным pass_code, возвращает detached-объект."""
-    pass_code = f"{prefix}-{uuid7().hex[:8]}"
+    pass_code = f"{prefix}-{uuid7().hex[:8]}"  # plain-код, в БД уходит хэш
     async with SessionLocal() as session:
         user = User(
-            pass_code=pass_code,
+            pass_code_hash=hash_pass_code(pass_code),
             full_name=f"Test {role.value.capitalize()}",
             role=role,
             active=True,

@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
+from solvix_chronometry.auth.hashing import hash_pass_code
 from solvix_chronometry.db import SessionLocal
 from solvix_chronometry.models.break_reasons import BreakReason
 from solvix_chronometry.models.enums import (
@@ -46,7 +47,7 @@ BREAK_REASONS = [
 
 async def get_or_create_user(session, pass_code, full_name):
     user = (await session.execute(
-        select(User).where(User.pass_code == pass_code)
+        select(User).where(User.pass_code_hash == hash_pass_code(pass_code))
     )).scalar_one_or_none()
     if user is not None:
         # Обновим имя если оно сменилось (для повторного запуска)
@@ -54,7 +55,7 @@ async def get_or_create_user(session, pass_code, full_name):
             user.full_name = full_name
         return user, False
     user = User(
-        pass_code=pass_code,
+        pass_code_hash=hash_pass_code(pass_code),
         full_name=full_name,
         role=UserRole.operator,
         active=True,

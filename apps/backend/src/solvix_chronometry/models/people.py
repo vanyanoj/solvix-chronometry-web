@@ -23,7 +23,7 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = uuid7_pk()
-    pass_code: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    pass_code_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
         nullable=False, server_default=UserRole.operator.value

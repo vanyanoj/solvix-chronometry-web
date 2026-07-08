@@ -6,6 +6,7 @@ import asyncio
 
 from sqlalchemy import select
 
+from solvix_chronometry.auth.hashing import hash_pass_code
 from solvix_chronometry.db import SessionLocal
 from solvix_chronometry.models.hierarchy import Line, Station
 from solvix_chronometry.models.people import NfcBadge, Shift, User
@@ -39,7 +40,12 @@ async def main():
             s.add(station)
             await s.flush()
 
-            user = User(id=uuid7(), pass_code=pass_code, full_name=operator_name, active=True)
+            user = User(
+                id=uuid7(),
+                pass_code_hash=hash_pass_code(pass_code),
+                full_name=operator_name,
+                active=True,
+            )
             badge = NfcBadge(id=uuid7(), uid=f"04:{mac}", status="free")
             s.add_all([user, badge])
             await s.flush()
