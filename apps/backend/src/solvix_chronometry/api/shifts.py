@@ -9,11 +9,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from solvix_chronometry.auth.dependencies import require_role
 from solvix_chronometry.db import get_session
-from solvix_chronometry.models.enums import ShiftClosedBy, UserRole
+from solvix_chronometry.models.enums import NfcBadgeStatus, ShiftClosedBy, UserRole
 from solvix_chronometry.models.hierarchy import Station
 from solvix_chronometry.models.people import NfcBadge, Shift, User
 
@@ -140,6 +141,13 @@ async def create_shift(
             detail=f"User {user.full_name!r} is inactive",
         )
 
+    # 2b. Валидация badge: lost нельзя выдавать, bound уже у кого-то
+    if badge.status != NfcBadgeStatus.free:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Badge {badge.uid!r} is already in use or lost (status: {badge.status.value})",
+        )
+
     # 3. Занятость
     if await _find_active_shift(session, user_id=user.id):
         raise HTTPException(
@@ -157,10 +165,20 @@ async def create_shift(
             detail=f"Badge {badge.uid!r} is already in use",
         )
 
-    # 4. Создать
+    # 4. Создать (бейдж занимается в той же транзакции)
     shift = Shift(user_id=user.id, badge_id=badge.id, station_id=station.id)
+    badge.status = NfcBadgeStatus.bound
     session.add(shift)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # Гонка: параллельный запрос успел создать смену между проверками
+        # и коммитом. Уникальные partial-индексы в БД — последний рубеж.
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User, station or badge was taken by a concurrent request",
+        ) from None
     await session.refresh(shift)
 
     return await _build_shift_response(session, shift)
@@ -201,9 +219,14 @@ async def force_close_shift(
             detail=f"Shift is already closed (unbound at {shift.unbound_at.isoformat()})",
         )
 
-    # Закрываем
+    # Закрываем + освобождаем бейдж (если его не пометили lost)
     shift.unbound_at = datetime.now(timezone.utc)
     shift.closed_by = ShiftClosedBy.supervisor
+    badge = (await session.execute(
+        select(NfcBadge).where(NfcBadge.id == shift.badge_id)
+    )).scalar_one_or_none()
+    if badge is not None and badge.status == NfcBadgeStatus.bound:
+        badge.status = NfcBadgeStatus.free
     await session.commit()
     await session.refresh(shift)
 
