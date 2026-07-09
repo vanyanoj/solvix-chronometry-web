@@ -59,3 +59,8 @@ mosquitto_data/
 
 # Backup files
 *.bak
+
+# --- Cython build artifacts (core) ---
+apps/backend/build/
+apps/backend/src/solvix_chronometry/core/**/*.c
+apps/backend/src/solvix_chronometry/core/*.c
