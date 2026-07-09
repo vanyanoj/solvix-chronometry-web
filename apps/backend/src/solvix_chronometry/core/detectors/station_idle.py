@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from solvix_chronometry.models.enums import EventType
 from solvix_chronometry.models.events import Event
 from solvix_chronometry.models.people import Shift
-from solvix_chronometry.watchdog.helpers import create_anomaly_event
+from solvix_chronometry.core.anomalies import create_anomaly_event
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ import os
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from solvix_chronometry.db import SessionLocal
-from solvix_chronometry.watchdog.detectors import detect_norm_exceeded, detect_pause_exceeded, detect_station_idle, detect_transit_stuck
+from solvix_chronometry.core.detectors import detect_norm_exceeded, detect_pause_exceeded, detect_station_idle, detect_transit_stuck
 
 logger = logging.getLogger(__name__)
 

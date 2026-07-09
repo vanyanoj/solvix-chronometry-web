@@ -15,7 +15,7 @@ from solvix_chronometry.models.enums import EventType, PartStatus
 from solvix_chronometry.models.events import Event
 from solvix_chronometry.models.hierarchy import Line, Station
 from solvix_chronometry.models.parts import Part
-from solvix_chronometry.watchdog.detectors.transit_stuck import detect_transit_stuck
+from solvix_chronometry.core.detectors.transit_stuck import detect_transit_stuck
 
 
 @pytest_asyncio.fixture
@@ -205,4 +205,4 @@ async def test_old_scan_out_ignored(temp_station: Station, temp_part: str) -> No
 
 
 # Импорт константы из детектора чтобы не дублировать
-from solvix_chronometry.watchdog.detectors.transit_stuck import TRANSIT_STUCK_THRESHOLD_SEC as TRANSIT_STUCK_THRESHOLD_SEC_EXPECTED  # noqa: E402
+from solvix_chronometry.core.detectors.transit_stuck import TRANSIT_STUCK_THRESHOLD_SEC as TRANSIT_STUCK_THRESHOLD_SEC_EXPECTED  # noqa: E402

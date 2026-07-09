@@ -53,15 +53,6 @@ class EventType(str, enum.Enum):
 
 
 class UserRole(str, enum.Enum):
-    """Роль пользователя — для JWT-авторизации и аудита (Решение №83)."""
-
-    warehouse = "warehouse"        # кладовщик
-    distributor = "distributor"    # распределитель
-    supervisor = "supervisor"      # старший смены
-    operator = "operator"          # оператор станка
-
-
-class UserRole(str, enum.Enum):
     """Роль пользователя — для JWT-авторизации и аудита (Решение №83).
 
     Старший смены выполняет роль распределителя (bind/unbind NFC-бейджей)

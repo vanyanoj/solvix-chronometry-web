@@ -3,7 +3,8 @@
 API-контракт — Обсидиан → Решения №84 (supervisor), №10-11 (NFC как пул),
 №36-38 (закрытие смены, force_close старшим).
 """
-from datetime import datetime, timezone
+import logging
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,6 +18,9 @@ from solvix_chronometry.db import get_session
 from solvix_chronometry.models.enums import NfcBadgeStatus, ShiftClosedBy, UserRole
 from solvix_chronometry.models.hierarchy import Station
 from solvix_chronometry.models.people import NfcBadge, Shift, User
+from solvix_chronometry.mqtt.publisher import publish_command
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/shifts", tags=["shifts"])
 
@@ -199,9 +203,12 @@ async def force_close_shift(
     не может вернуться на станок. Устанавливает `unbound_at=now` и
     `closed_by=supervisor` — это попадёт в аудит и аналитику.
 
-    TODO для прода: дополнительно публиковать MQTT-команду на терминал
-    станка чтобы ESP32 узнал о принудительном закрытии и очистил state
-    (Решение №80, force_close_shift команда).
+    TODO для прода: оптимизировать publisher до persistent-клиента.
+
+    После коммита публикует MQTT-команду `force_close_shift` на терминал
+    станка (Решение №80) — ESP32 очищает state. Best-effort: если брокер
+    недоступен, смена всё равно закрыта (БД — источник истины), недоставка
+    логируется.
     """
     shift = (await session.execute(
         select(Shift).where(Shift.id == shift_id)
@@ -220,7 +227,7 @@ async def force_close_shift(
         )
 
     # Закрываем + освобождаем бейдж (если его не пометили lost)
-    shift.unbound_at = datetime.now(timezone.utc)
+    shift.unbound_at = datetime.now(UTC)
     shift.closed_by = ShiftClosedBy.supervisor
     badge = (await session.execute(
         select(NfcBadge).where(NfcBadge.id == shift.badge_id)
@@ -229,5 +236,18 @@ async def force_close_shift(
         badge.status = NfcBadgeStatus.free
     await session.commit()
     await session.refresh(shift)
+
+    # Уведомить терминал (best-effort, после коммита)
+    try:
+        await publish_command(
+            shift.station_id,
+            "force_close_shift",
+            {"shift_id": str(shift.id)},
+        )
+    except Exception:
+        logger.warning(
+            "force_close_shift command not delivered to station %s (shift %s)",
+            shift.station_id, shift.id, exc_info=True,
+        )
 
     return await _build_shift_response(session, shift)

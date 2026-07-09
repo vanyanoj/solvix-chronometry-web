@@ -14,7 +14,7 @@ from solvix_chronometry.db import SessionLocal
 from solvix_chronometry.models.enums import EventType
 from solvix_chronometry.models.events import Event
 from solvix_chronometry.models.hierarchy import Line, Station
-from solvix_chronometry.watchdog.helpers import create_anomaly_event
+from solvix_chronometry.core.anomalies import create_anomaly_event
 from solvix_chronometry.watchdog.runner import run_watchdog
 
 

@@ -22,7 +22,7 @@ from solvix_chronometry.models.enums import EventType
 from solvix_chronometry.models.events import Event
 from solvix_chronometry.models.hierarchy import Station
 from solvix_chronometry.models.processes import Process
-from solvix_chronometry.watchdog.helpers import create_anomaly_event
+from solvix_chronometry.core.anomalies import create_anomaly_event
 
 logger = logging.getLogger(__name__)
 

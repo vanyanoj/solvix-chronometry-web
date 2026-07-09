@@ -9,7 +9,7 @@
 - `transit_stuck`   — деталь застряла между станками (этап 5)
 """
 
-from solvix_chronometry.watchdog.helpers import create_anomaly_event
+from solvix_chronometry.core.anomalies import create_anomaly_event
 from solvix_chronometry.watchdog.runner import run_watchdog
 
 __all__ = ["create_anomaly_event", "run_watchdog"]

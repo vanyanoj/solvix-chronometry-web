@@ -24,6 +24,10 @@ dev = [
     "ruff>=0.7",
     "mypy>=1.13",
 ]
+build = [
+    "cython>=3.0",
+    "setuptools>=69",
+]
 
 [build-system]
 requires = ["hatchling"]

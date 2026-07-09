@@ -14,7 +14,7 @@ from solvix_chronometry.models.enums import EventType
 from solvix_chronometry.models.events import Event
 from solvix_chronometry.models.hierarchy import Line, Station
 from solvix_chronometry.models.processes import Process
-from solvix_chronometry.watchdog.detectors.norm_exceeded import detect_norm_exceeded
+from solvix_chronometry.core.detectors.norm_exceeded import detect_norm_exceeded
 
 
 @pytest_asyncio.fixture

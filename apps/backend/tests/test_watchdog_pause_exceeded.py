@@ -14,7 +14,7 @@ from solvix_chronometry.models.break_reasons import BreakReason
 from solvix_chronometry.models.enums import EventType
 from solvix_chronometry.models.events import Event
 from solvix_chronometry.models.hierarchy import Line, Station
-from solvix_chronometry.watchdog.detectors.pause_exceeded import detect_pause_exceeded
+from solvix_chronometry.core.detectors.pause_exceeded import detect_pause_exceeded
 
 
 @pytest_asyncio.fixture

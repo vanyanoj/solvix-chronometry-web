@@ -14,7 +14,7 @@ from solvix_chronometry.models.enums import EventType
 from solvix_chronometry.models.events import Event
 from solvix_chronometry.models.hierarchy import Line, Station
 from solvix_chronometry.models.people import NfcBadge, Shift, User
-from solvix_chronometry.watchdog.detectors.station_idle import detect_station_idle
+from solvix_chronometry.core.detectors.station_idle import detect_station_idle
 
 
 @pytest_asyncio.fixture

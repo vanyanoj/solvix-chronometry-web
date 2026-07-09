@@ -20,7 +20,6 @@ from solvix_chronometry.models.hierarchy import Line, Station
 from solvix_chronometry.models.people import NfcBadge, Shift, User
 from solvix_chronometry.uuid_v7 import uuid7
 
-
 # === Fixtures ===
 
 async def _create_test_station(name_suffix: str = "") -> tuple[UUID, str, str]:
@@ -394,3 +393,48 @@ async def test_force_close_already_closed_returns_409(
     r2 = await supervisor_client.post(f"/api/v1/shifts/{active_shift.id}/force_close")
     assert r2.status_code == 409
     assert "already closed" in r2.json()["detail"].lower()
+
+
+async def test_force_close_publishes_mqtt_command(
+    supervisor_client: AsyncClient,
+    active_shift: Shift,
+    monkeypatch,
+) -> None:
+    """force_close публикует команду force_close_shift на терминал станка."""
+    calls: list[tuple] = []
+
+    async def fake_publish(station_id, command, params=None):
+        calls.append((station_id, command, params))
+        return "fake-command-id"
+
+    monkeypatch.setattr(
+        "solvix_chronometry.api.shifts.publish_command", fake_publish,
+    )
+
+    r = await supervisor_client.post(f"/api/v1/shifts/{active_shift.id}/force_close")
+    assert r.status_code == 200, r.text
+
+    assert len(calls) == 1
+    station_id, command, params = calls[0]
+    assert station_id == active_shift.station_id
+    assert command == "force_close_shift"
+    assert params == {"shift_id": str(active_shift.id)}
+
+
+async def test_force_close_succeeds_when_mqtt_down(
+    supervisor_client: AsyncClient,
+    active_shift: Shift,
+    monkeypatch,
+) -> None:
+    """Недоступный брокер не ломает закрытие смены (best-effort)."""
+
+    async def broken_publish(*args, **kwargs):
+        raise ConnectionError("broker down")
+
+    monkeypatch.setattr(
+        "solvix_chronometry.api.shifts.publish_command", broken_publish,
+    )
+
+    r = await supervisor_client.post(f"/api/v1/shifts/{active_shift.id}/force_close")
+    assert r.status_code == 200, r.text
+    assert r.json()["closed_by"] == "supervisor"
