@@ -25,6 +25,8 @@ from solvix_chronometry.api.search import router as search_router
 from solvix_chronometry.api.timelines import router as timelines_router
 from solvix_chronometry.api.analytics import router as analytics_router
 from solvix_chronometry.api.stations import router as stations_router
+from solvix_chronometry.api.processes import router as processes_router
+from solvix_chronometry.api.lines import router as lines_router
 from solvix_chronometry.mqtt.subscriber import run_subscriber
 from solvix_chronometry.watchdog import run_watchdog
 
@@ -79,6 +81,8 @@ app.include_router(search_router, prefix="/api/v1")
 app.include_router(timelines_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(stations_router, prefix="/api/v1")
+app.include_router(processes_router, prefix="/api/v1")
+app.include_router(lines_router, prefix="/api/v1")
 app.include_router(ws_router, prefix="/api/v1")
 
 app.add_middleware(

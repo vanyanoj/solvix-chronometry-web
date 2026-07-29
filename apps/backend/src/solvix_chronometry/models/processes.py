@@ -6,6 +6,9 @@
 со своим нормативом на момент выполнения.
 
 `anomaly_threshold_pct` — порог аномалии превышения норматива (см. Решение №63).
+
+`line_id` — на какой линии выполняется операция (Решение №85: изделие = линия).
+Топология пирамиды выводится из этого справочника (Решение №86).
 """
 
 from __future__ import annotations
@@ -25,11 +28,22 @@ class Process(Base):
 
     id: Mapped[uuid.UUID] = uuid7_pk()
 
+    # Линия = сборочный поток = изделие (Решение №85). Nullable ради
+    # обратной совместимости с уже засеянными строками; заполняется при
+    # бэкфилле через станок и требуется для попадания в топологию.
+    line_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("lines.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+
     input_type_1: Mapped[str] = mapped_column(String(50), nullable=False)
     input_type_2: Mapped[str] = mapped_column(String(50), nullable=False)
     output_type: Mapped[str] = mapped_column(String(50), nullable=False)
 
-    # Где обычно выполняется (для UI / валидации, не жёсткая привязка — Решение №13).
+    # Где выполняется. Исторически «hint» (Решение №13), но для топологии
+    # обязателен: без него узел не строится (Решение №87).
     station_hint: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("stations.id", ondelete="SET NULL"),
