@@ -5,6 +5,9 @@ import { AssignmentsScreen } from "@/screens/assignments/AssignmentsScreen";
 import { SettingsScreen } from "@/screens/settings/SettingsScreen";
 import { OverviewScreen } from "@/screens/overview/OverviewScreen";
 import { LineDetailScreen } from "@/screens/overview/LineDetailScreen";
+import { EventsScreen } from "@/screens/events/EventsScreen";
+import { PeopleScreen } from "@/screens/people/PeopleScreen";
+import { AnalyticsScreen } from "@/screens/analytics/AnalyticsScreen";
 
 /** Временная заглушка для разделов, которые ещё не собраны. */
 function Stub({ title }: { title: string }) {
@@ -34,9 +37,9 @@ export default function App() {
         <Route path="assignments" element={<AssignmentsScreen />} />
         <Route path="overview" element={<OverviewScreen />} />
         <Route path="overview/:lineId" element={<LineDetailScreen />} />
-        <Route path="people" element={<Stub title="Сотрудники" />} />
-        <Route path="analytics" element={<Stub title="Аналитика" />} />
-        <Route path="events" element={<Stub title="События" />} />
+        <Route path="people" element={<PeopleScreen />} />
+        <Route path="analytics" element={<AnalyticsScreen />} />
+        <Route path="events" element={<EventsScreen />} />
         <Route path="settings" element={<SettingsScreen />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
