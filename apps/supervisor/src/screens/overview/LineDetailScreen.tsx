@@ -83,6 +83,12 @@ export function LineDetailScreen() {
   useEffect(() => { void load(); }, [load]);
 
   const stationById = useMemo(() => new Map(stations.map((s) => [s.id, s])), [stations]);
+  /** Инциденты только этой линии: по станкам из топологии. */
+  const lineIncidents = useMemo(() => {
+    if (!topology) return incidents;
+    const ids = new Set(topology.nodes.map((n) => n.station_id));
+    return incidents.filter((i) => ids.has(i.station_id));
+  }, [incidents, topology]);
   const operatorCount = useMemo(
     () => topology?.nodes.filter((n) => stationById.get(n.station_id)?.operator).length ?? 0,
     [topology, stationById],
@@ -130,7 +136,7 @@ export function LineDetailScreen() {
           <TreeKpi icon="box" iconBg="#F3EFFB" iconFg="#7C6FDD" label="Готово / план" value="—" unit="шт" note="появится с планом смены" noteColor="#98A2B3" />
           <TreeKpi icon="eff" iconBg="#EFF5FE" iconFg="#3B82F6" label="Эффективность" value="—" note="появится с планом смены" noteColor="#98A2B3" />
           <TreeKpi icon="people" iconBg="#EAF7EF" iconFg="#16A34A" label="Сотрудников" value={topology ? `${operatorCount} / ${topology.nodes.length}` : "—"} note={topology && operatorCount < topology.nodes.length ? `${topology.nodes.length - operatorCount} станций свободно` : "все станции заняты"} noteColor="#16A34A" />
-          <TreeKpi icon="warn" iconBg="#FEF3E6" iconFg="#F79009" label="Проблемы" value={String(incidents.length)} note={incidents.length > 0 ? "требуют внимания" : "всё спокойно"} noteColor={incidents.length > 0 ? "#F79009" : "#16A34A"} />
+          <TreeKpi icon="warn" iconBg="#FEF3E6" iconFg="#F79009" label="Проблемы" value={String(lineIncidents.length)} note={lineIncidents.length > 0 ? "требуют внимания" : "всё спокойно"} noteColor={lineIncidents.length > 0 ? "#F79009" : "#16A34A"} />
           <TreeKpi icon="clock" iconBg="#EFF5FE" iconFg="#3B82F6" label="Задержки" value="—" note="появится с топологией" noteColor="#98A2B3" />
         </div>
 
@@ -208,7 +214,7 @@ export function LineDetailScreen() {
           node={selected}
           snap={stationById.get(selected.station_id)}
           topology={topology!}
-          incidents={incidents.filter((i) => i.station_id === selected.station_id)}
+          incidents={lineIncidents.filter((i) => i.station_id === selected.station_id)}
           onClose={() => setSelected(null)}
         />
       )}
@@ -293,7 +299,7 @@ function TreeCanvas({
       });
       levelMeta.push({
         y: yCursor + h / 2 - 16,
-        name: lvl === levels[levels.length - 1] && lvl > 0 ? "Финал" : `Уровень ${lvl + 1}`,
+        name: `Уровень ${lvl + 1}`,
         sub: `${nodes.length} ${plural(nodes.length, "станция", "станции", "станций")}`,
       });
       yCursor -= LEVEL_GAP;
@@ -322,10 +328,11 @@ function TreeCanvas({
               return (
                 <path
                   key={`${src}-${n.station_id}`}
-                  d={`M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`}
+                  d={`M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`}
                   stroke="#CBD2DC"
                   strokeWidth={1.6}
                   strokeLinecap="round"
+                  strokeLinejoin="round"
                 />
               );
             }),

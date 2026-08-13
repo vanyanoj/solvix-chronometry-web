@@ -53,6 +53,27 @@ export function OverviewScreen() {
     [stations],
   );
 
+  /** line_id в снимках есть → раскладываем данные по линиям; нет → фолбэк на общие. */
+  const perLine = useMemo(() => {
+    const hasLineIds = stations.some((s) => s.line_id);
+    if (!hasLineIds) return null;
+    const stationLine = new Map(stations.map((s) => [s.id, s.line_id ?? null]));
+    const ops = new Map<string, string[]>();
+    for (const s of stations) {
+      if (s.operator && s.line_id) {
+        const arr = ops.get(s.line_id) ?? [];
+        arr.push(s.operator.full_name);
+        ops.set(s.line_id, arr);
+      }
+    }
+    const probs = new Map<string, number>();
+    for (const inc of incidents) {
+      const lid = stationLine.get(inc.station_id);
+      if (lid) probs.set(lid, (probs.get(lid) ?? 0) + 1);
+    }
+    return { ops, probs };
+  }, [stations, incidents]);
+
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return lines
@@ -163,8 +184,8 @@ export function OverviewScreen() {
               key={line.id}
               line={line}
               status={status}
-              operators={operators}
-              problems={incidents.length}
+              operators={perLine ? (perLine.ops.get(line.id) ?? []) : operators}
+              problems={perLine ? (perLine.probs.get(line.id) ?? 0) : incidents.length}
               onOpen={() => navigate(`/app/overview/${line.id}`)}
             />
           ))

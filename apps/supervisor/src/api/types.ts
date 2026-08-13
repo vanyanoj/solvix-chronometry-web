@@ -99,6 +99,8 @@ export interface LastEventSnapshot {
 export interface StationSnapshot {
   id: string;
   name: string;
+  /** Линия станка; появляется после микропатча dashboard (может отсутствовать). */
+  line_id?: string | null;
   operator: OperatorSnapshot | null;
   active_shift_id: string | null;
   last_event: LastEventSnapshot | null;
