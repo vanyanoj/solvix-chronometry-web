@@ -37,6 +37,7 @@ class LastEventSnapshot(BaseModel):
 class StationSnapshot(BaseModel):
     id: UUID
     name: str
+    line_id: UUID | None = None
     operator: OperatorSnapshot | None = None
     active_shift_id: UUID | None = None
     last_event: LastEventSnapshot | None = None
@@ -98,6 +99,7 @@ async def get_dashboard_stations(
         result.append(StationSnapshot(
             id=station.id,
             name=station.name,
+            line_id=station.line_id,
             operator=operator,
             active_shift_id=active_shift_id,
             last_event=last_event,

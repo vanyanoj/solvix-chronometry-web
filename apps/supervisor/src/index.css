@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Solvix Chronometry — токены светлой темы.
+ * Значения выведены 1:1 из дизайн-прототипа (FlowLine / Solvix Chronometry).
+ */
+@layer base {
+  :root {
+    /* --- shadcn/ui семантика (HSL, без hsl()) --- */
+    --background: 220 16% 97%; /* #F6F7F9 — фон приложения */
+    --foreground: 222 43% 11%; /* #101828 — основной текст */
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 43% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 43% 11%;
+
+    --primary: 142 76% 36%; /* #16A34A — зелёный акцент */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 16% 96%;
+    --secondary-foreground: 222 43% 11%;
+
+    --muted: 220 16% 96%;
+    --muted-foreground: 220 13% 46%; /* #667085 */
+
+    --accent: 145 55% 94%; /* #EAF7EF — светло-зелёная плашка */
+    --accent-foreground: 142 72% 24%;
+
+    --destructive: 4 52% 49%; /* #C0453C */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 17% 93%; /* #EAECF0 */
+    --input: 220 17% 93%;
+    --ring: 142 76% 36%;
+
+    --radius: 0.75rem; /* умеренные радиусы (~12px) */
+
+    /* --- Бренд Solvix --- */
+    --fl-ink: #1e2a44; /* тёмно-синий логотипа/заголовков-бренда */
+    --fl-gold: #c9a54e; /* золотая метка в значке */
+
+    --fl-brand: #16a34a;
+    --fl-brand-hover: #12833c;
+    --fl-brand-soft: #eaf7ef; /* фон активного пункта меню / бейджа ok */
+    --fl-brand-faint: #f7fcf9;
+
+    /* --- Статусы --- */
+    --fl-ok: #16a34a;
+    --fl-ok-soft: #eaf7ef;
+    --fl-warn: #f79009; /* оранжевый: сниженный темп / задержка */
+    --fl-warn-soft: #fef3e6;
+    --fl-danger: #c0453c; /* красный: остановка / критическое */
+    --fl-danger-soft: #fdeeec;
+    --fl-info: #3b82f6; /* синий: информационное */
+    --fl-info-soft: #eff5fe;
+    --fl-idle: #98a2b3; /* серый: не запущен / нет данных */
+    --fl-idle-soft: #f3f4f6;
+
+    /* Мягкая граница-разделитель (чуть светлее основной) */
+    --fl-line-soft: #edeff2;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-variant-numeric: tabular-nums;
+    margin: 0;
+  }
+  a {
+    color: var(--fl-brand);
+    text-decoration: none;
+  }
+  a:hover {
+    color: var(--fl-brand-hover);
+  }
+}
